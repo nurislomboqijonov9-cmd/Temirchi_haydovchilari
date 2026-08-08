@@ -1,0 +1,95 @@
+<!doctype html><html lang="uz"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1E7A5A"><title>TEMIRCHI — Kuzatuv</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center}
+.logo{font-size:22px;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
+.logo b{color:#39d98a}
+.sub{color:#8aa0a8;font-size:13px;margin-bottom:26px}
+.dot{width:132px;height:132px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:52px;margin:0 auto 18px;transition:.3s;background:#14202a;border:3px solid #24333d}
+.on .dot{background:radial-gradient(circle,#1E7A5A,#124c39);border-color:#39d98a;box-shadow:0 0 0 8px rgba(57,217,138,.12),0 0 40px rgba(57,217,138,.3);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 8px rgba(57,217,138,.12),0 0 30px rgba(57,217,138,.25)}50%{box-shadow:0 0 0 14px rgba(57,217,138,.05),0 0 50px rgba(57,217,138,.4)}}
+.st{font-size:20px;font-weight:700;margin-bottom:6px}
+.info{color:#8aa0a8;font-size:13px;line-height:1.9;margin-bottom:24px}
+.info b{color:#cfe}
+.btn{width:100%;max-width:340px;padding:16px;border:none;border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;color:#fff}
+.start{background:#1E7A5A}.stop{background:#c0392b}
+.warn{background:#3a2a12;border:1px solid #a06a1e;color:#f0c674;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:18px;max-width:340px;line-height:1.5}
+.hide{display:none}
+.foot{margin-top:26px;color:#5a6b73;font-size:11px;line-height:1.6}
+</style></head>
+<body>
+<div id="wrap">
+  <div class="logo">TEMIR<b>CHI</b></div>
+  <div class="sub">Haydovchi kuzatuvi</div>
+  <div class="dot" id="dot">📍</div>
+  <div class="st" id="st">Kuzatuv o'chiq</div>
+  <div class="info" id="info">Ishni boshlaganda tugmani bosing.</div>
+  <div class="warn hide" id="warn"></div>
+  <button class="btn start" id="btn">▶️ Kuzatuvni boshlash</button>
+  <div class="foot">Ilova ochiq turса — joylashuv avtomat yuboriladi.<br>Internet bo'lmasa ham saqlanadi, ulanganda yuboriladi.</div>
+</div>
+<script>
+const TOKEN=location.pathname.split('/').filter(Boolean).pop();
+const BUF='gps_buf_'+TOKEN;
+let watchId=null, wake=null, lastP=null, lastT=0, tracking=false;
+const $=id=>document.getElementById(id);
+
+function buf(){ try{return JSON.parse(localStorage.getItem(BUF)||'[]');}catch(e){return[];} }
+function setBuf(a){ try{localStorage.setItem(BUF,JSON.stringify(a.slice(-500)));}catch(e){} }
+function dist(a,b){ if(!a||!b)return 1e9; const R=6371000,r=x=>x*Math.PI/180;
+  const d1=r(b.lat-a.lat),d2=r(b.lon-a.lon),h=Math.sin(d1/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(d2/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
+
+function onPos(p){
+  const now=Date.now();
+  const pt={lat:p.coords.latitude,lon:p.coords.longitude,vaqt:new Date().toISOString().slice(0,19),acc:Math.round(p.coords.accuracy||0)};
+  // throttle: 15 soniya YOKI 20 metrdan ko'p siljisa
+  if(lastP && (now-lastT)<15000 && dist(lastP,pt)<20) return;
+  lastP=pt; lastT=now;
+  const a=buf(); a.push(pt); setBuf(a);
+  $('info').innerHTML="So'nggi: <b>"+pt.vaqt.slice(11,16)+"</b> · aniqlik <b>"+pt.acc+" m</b><br>Yuborilmagan: <b>"+a.length+"</b>";
+  hideWarn();
+  flush();
+}
+function onErr(e){
+  if(e.code===1){ showWarn("⚠️ Joylashuvga ruxsat berilmagan. Sozlamalardan yoqing."); gpsOff("Ruxsat berilmadi"); }
+  else if(e.code===2){ showWarn("⚠️ GPS signal yo'q yoki o'chirilgan."); gpsOff("GPS signal yo'q"); }
+}
+async function flush(){
+  const a=buf(); if(!a.length) return;
+  try{
+    const r=await fetch('/api/gps',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:TOKEN,points:a})});
+    if(r.ok){ setBuf([]); }   // yuborildi — buferni tozalaymiz
+  }catch(e){ /* internet yo'q — keyin urinadi */ }
+}
+async function gpsOff(sabab){
+  try{ await fetch('/api/gps_off',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,sabab})}); }catch(e){}
+}
+function showWarn(t){ $('warn').textContent=t; $('warn').classList.remove('hide'); }
+function hideWarn(){ $('warn').classList.add('hide'); }
+
+async function start(){
+  if(!navigator.geolocation){ showWarn("Bu qurilmada GPS yo'q."); return; }
+  tracking=true; document.body.classList.add('on');
+  $('st').textContent="Kuzatuv yoniq ✅"; $('btn').textContent="⏹ To'xtatish"; $('btn').className="btn stop";
+  $('info').textContent="Joylashuv olinmoqda…";
+  watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+  setInterval(flush,30000);   // har 30s da yuborishga urinadi
+  try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function stop(){
+  tracking=false; document.body.classList.remove('on');
+  if(watchId!=null) navigator.geolocation.clearWatch(watchId);
+  try{ wake&&wake.release&&wake.release(); }catch(e){}
+  $('st').textContent="Kuzatuv o'chiq"; $('btn').textContent="▶️ Kuzatuvni boshlash"; $('btn').className="btn start";
+  $('info').textContent="Ishni boshlaganda tugmani bosing."; flush();
+}
+$('btn').onclick=()=>{ tracking?stop():start(); };
+// ekran qайta yoniqда wakelock tiklash
+document.addEventListener('visibilitychange',async()=>{ if(tracking&&document.visibilityState==='visible'){ try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){} flush(); } });
+window.addEventListener('online',flush);
+if(!TOKEN||TOKEN==='kuzat'){ $('st').textContent="Havola noto'g'ri"; $('btn').classList.add('hide'); }
+</script></body></html>

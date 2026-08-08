@@ -1,0 +1,79 @@
+<!doctype html><html lang="uz"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TEMIRCHI — Karta</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#14202a;position:sticky;top:0;z-index:1000}
+.bar b{font-size:15px}.bar .sp{flex:1}
+.bar input,.bar button{background:#1e2c36;border:1px solid #2c3d47;color:#eaf2ee;border-radius:8px;padding:7px 10px;font-size:14px}
+.bar button{cursor:pointer}
+#map{height:calc(100vh - 120px);background:#223}
+.stat{display:flex;gap:14px;padding:9px 12px;background:#111a22;font-size:13px;color:#9fb4bc;flex-wrap:wrap}
+.stat b{color:#39d98a}
+.tip{background:#c0392b;color:#fff;border:2px solid #fff;border-radius:12px;padding:2px 8px;font-weight:800;font-size:12px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.tip:before{border-top-color:#c0392b!important}
+.empty{position:absolute;top:50%;left:0;right:0;text-align:center;color:#7a8c94;z-index:500}
+</style></head>
+<body>
+<div class="bar">
+  <b id="nom">🚚 Karta</b><div class="sp"></div>
+  <button onclick="kun(-1)">‹</button>
+  <input type="date" id="sana" onchange="yukla()">
+  <button onclick="kun(1)">›</button>
+</div>
+<div class="stat" id="stat"></div>
+<div style="position:relative"><div id="map"></div><div class="empty" id="empty" style="display:none">Bu kunda ma'lumot yo'q.</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script>
+const Q=new URLSearchParams(location.search);
+const HID=Q.get('hid'), TOK=Q.get('tok')||(()=>{try{return localStorage.getItem('tok')||''}catch(e){return''}})();
+if(Q.get('nom')) document.getElementById('nom').textContent='🚚 '+Q.get('nom');
+document.getElementById('sana').value=Q.get('sana')||new Date().toISOString().slice(0,10);
+
+let map=L.map('map',{zoomControl:true,attributionControl:false}).setView([41.311,69.24],12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let layer=L.layerGroup().addTo(map), heat=null;
+const fmt=t=>(t||'').slice(11,16);
+function kun(d){ const s=document.getElementById('sana'); const dt=new Date(s.value); dt.setDate(dt.getDate()+d); s.value=dt.toISOString().slice(0,10); yukla(); }
+
+async function yukla(){
+  layer.clearLayers(); if(heat){ map.removeLayer(heat); heat=null; }
+  const sana=document.getElementById('sana').value;
+  let x; try{
+    const r=await fetch('/api/gps_view?hid='+encodeURIComponent(HID)+'&sana='+sana,{headers:{'X-Token':TOK}});
+    x=await r.json();
+  }catch(e){ document.getElementById('stat').innerHTML='Xato: '+e.message; return; }
+  const pts=(x&&x.nuqtalar)||[], stops=(x&&x.toxtashlar)||[];
+  document.getElementById('empty').style.display=pts.length?'none':'block';
+  const jamiDaq=stops.reduce((a,s)=>a+s.daqiqa,0), soat=Math.floor(jamiDaq/60), daq=jamiDaq%60;
+  document.getElementById('stat').innerHTML=
+    "📏 <b>"+((x&&x.km)||0)+" km</b> &nbsp; 🛑 to'xtash: <b>"+stops.length+"</b>"+
+    (stops.length?(" ("+(soat?soat+"s ":"")+daq+"daq)"):"")+" &nbsp; 📍 <b>"+pts.length+"</b> nuqta";
+  if(!pts.length) return;
+
+  // ===== ISSIQLIK KARTASI (heatmap) =====
+  const hp=pts.map(p=>[p.lat,p.lon,0.5]);
+  stops.forEach(s=>{ const w=Math.min(3,0.5+s.daqiqa/20); for(let k=0;k<Math.ceil(s.daqiqa/3);k++) hp.push([s.lat,s.lon,w]); });
+  heat=L.heatLayer(hp,{radius:28,blur:20,maxZoom:17,minOpacity:.35,
+    gradient:{0.2:'#2c7bb6',0.45:'#00ccbc',0.65:'#ffd93b',0.85:'#fb8c00',1.0:'#e53935'}}).addTo(map);
+
+  // ===== Yo'l chizig'i (xira, kontekst) =====
+  const line=pts.map(p=>[p.lat,p.lon]);
+  L.polyline(line,{color:'#eaf2ee',weight:2,opacity:.28}).addTo(layer);
+  L.circleMarker(line[0],{radius:6,color:'#fff',fillColor:'#2ecc71',fillOpacity:1}).bindPopup('Boshi '+fmt(pts[0].vaqt)).addTo(layer);
+  L.circleMarker(line[line.length-1],{radius:6,color:'#fff',fillColor:'#e74c3c',fillOpacity:1}).bindPopup('Oxiri '+fmt(pts[pts.length-1].vaqt)).addTo(layer);
+
+  // ===== To'xtashlar — tepasida necha daqiqa =====
+  stops.forEach(s=>{
+    L.tooltip({permanent:true,direction:'top',offset:[0,-6],className:'tip'})
+      .setContent(s.daqiqa+' daq').setLatLng([s.lat,s.lon]).addTo(layer);
+    L.circleMarker([s.lat,s.lon],{radius:5,color:'#fff',fillColor:'#c0392b',fillOpacity:1})
+      .bindPopup('🛑 <b>'+s.daqiqa+' daqiqa</b><br>'+fmt(s.boshlanish)+' – '+fmt(s.tugash)).addTo(layer);
+  });
+  map.fitBounds(L.polyline(line).getBounds(),{padding:[50,50]});
+}
+if(!HID){ document.getElementById('stat').textContent="Haydovchi tanlanmagan"; } else { yukla(); }
+</script></body></html>

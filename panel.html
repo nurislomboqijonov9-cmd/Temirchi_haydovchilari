@@ -1,0 +1,93 @@
+<!doctype html><html lang="uz"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TEMIRCHI — Kuzatuv paneli</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee;padding:14px;max-width:640px;margin:0 auto}
+.top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.top b{font-size:19px;font-weight:800}.top .sp{flex:1}
+.card{background:#16232e;border:1px solid #223240;border-radius:14px;padding:13px;margin-bottom:11px}
+.t{font-weight:700;margin-bottom:9px}
+.f{width:100%;background:#0f1a22;border:1px solid #2a3b47;color:#eaf2ee;border-radius:10px;padding:11px;font-size:15px}
+.row{display:flex;gap:8px;align-items:center}
+.btn{background:#1E7A5A;border:none;color:#fff;border-radius:10px;padding:11px 14px;font-weight:700;font-size:14px;cursor:pointer}
+.mini{background:#22323d;border:1px solid #33454f;color:#eaf2ee;border-radius:9px;padding:8px 10px;font-size:13px;cursor:pointer}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 0;border-bottom:1px solid #1e2c36}
+.hrow:last-child{border-bottom:none}
+.nom{font-weight:700;font-size:15px}
+.sub{color:#8aa0a8;font-size:12.5px;margin-top:2px}
+.sub b{color:#39d98a}
+.x{color:#e06a6a;cursor:pointer;font-size:16px;padding:4px 6px}
+.hint{color:#7a8c94;font-size:12px;line-height:1.6}
+.empty{text-align:center;color:#7a8c94;padding:24px}
+.tag{display:inline-block;background:#0f2a20;color:#39d98a;border-radius:6px;padding:1px 7px;font-size:11px;margin-left:6px}
+</style></head>
+<body>
+<div class="top"><b>🚚 Haydovchilar</b><div class="sp"></div><button class="mini" onclick="yukla()">↻</button></div>
+
+<div class="card">
+  <div class="t">➕ Haydovchi qo'shish</div>
+  <input class="f" id="h_ism" placeholder="Ism (masalan: Akmal)" style="margin-bottom:8px">
+  <div class="row"><input class="f" id="h_tel" placeholder="Telefon (ixtiyoriy)"><button class="btn" onclick="qosh()">Qo'shish</button></div>
+</div>
+
+<div class="card">
+  <div class="t">📋 Bugungi holat</div>
+  <div id="list"><div class="empty">Yuklanmoqda…</div></div>
+</div>
+
+<div class="hint">Har haydovchiga <b>🔗 Havola</b>ni bir marta yuboring — u ochib «Boshlash» bossin (bosh ekranga qo'shsa — ilovadek). Kartada kunlik <b>issiqlik</b> va <b>to'xtashlar</b> ko'rinadi. Har kuni soat 19:00 da avtomat hisobot keladi.</div>
+
+<script>
+const tg=window.Telegram&&window.Telegram.WebApp; if(tg){tg.ready();tg.expand();}
+const H={'X-Init-Data':(tg&&tg.initData)||''};
+let TOK='';
+const bugun=new Date().toISOString().slice(0,10);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(t){ if(tg&&tg.showPopup){try{tg.showPopup({message:t});return}catch(e){}} alert(t); }
+
+async function api(u,o){ o=o||{}; o.headers=Object.assign({'Content-Type':'application/json'},H,o.headers||{});
+  const r=await fetch(u,o); if(!r.ok) throw new Error((await r.json().catch(()=>({}))).xato||('HTTP '+r.status)); return r.json(); }
+
+async function yukla(){
+  try{ const t=await api('/api/token'); TOK=t.tok||''; }catch(e){}
+  try{
+    const d=await api('/api/haydovchilar');
+    const L=d.haydovchilar||[]; const el=document.getElementById('list');
+    if(!L.length){ el.innerHTML='<div class="empty">Haydovchi yo\'q. Yuqoridan qo\'shing.</div>'; return; }
+    el.innerHTML=L.map(h=>{
+      const bor=h.nuqta>0;
+      return '<div class="hrow"><div style="flex:1">'
+        +'<div class="nom">'+esc(h.ism)+(bor?'<span class="tag">bugun faol</span>':'')+'</div>'
+        +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')+'</div></div>'
+        +'<div class="row">'
+        +'<button class="mini" onclick="karta('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">🗺</button>'
+        +'<button class="mini" onclick="havola('+h.id+')">🔗</button>'
+        +'<span class="x" onclick="ochir('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">✕</span></div></div>';
+    }).join('');
+  }catch(e){ document.getElementById('list').innerHTML='<div class="empty">Xato: '+e.message+'</div>'; }
+}
+async function qosh(){
+  const ism=(document.getElementById('h_ism').value||'').trim();
+  const tel=(document.getElementById('h_tel').value||'').trim();
+  if(!ism){ toast('Ism yozing'); return; }
+  try{ await api('/api/haydovchi_qosh',{method:'POST',body:JSON.stringify({ism,tel})});
+    document.getElementById('h_ism').value=''; document.getElementById('h_tel').value=''; toast('✅ Qo\'shildi'); yukla(); }
+  catch(e){ toast('❌ '+e.message); }
+}
+async function ochir(id,ism){
+  if(!confirm(ism+' — ro\'yxatdan olinsinmi?')) return;
+  try{ await api('/api/haydovchi_ochir',{method:'POST',body:JSON.stringify({id})}); yukla(); }catch(e){ toast('❌ '+e.message); }
+}
+function karta(id,ism){
+  const u='/harita?hid='+id+'&sana='+bugun+'&nom='+encodeURIComponent(ism)+'&tok='+encodeURIComponent(TOK);
+  if(tg&&tg.openLink){ tg.openLink(location.origin+u); } else { window.open(u,'_blank'); }
+}
+async function havola(id){
+  try{ const d=await api('/api/haydovchi_kuzat?hid='+id);
+    if(d.havola){ try{await navigator.clipboard.writeText(d.havola);}catch(e){}
+      if(tg&&tg.showPopup){try{tg.showPopup({title:'Kuzatuv havolasi',message:d.havola});}catch(e){alert(d.havola);}} else alert(d.havola); } }
+  catch(e){ toast('❌ '+e.message); }
+}
+yukla();
+</script></body></html>
