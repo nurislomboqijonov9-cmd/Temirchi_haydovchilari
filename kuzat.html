@@ -42,9 +42,16 @@ function dist(a,b){ if(!a||!b)return 1e9; const R=6371000,r=x=>x*Math.PI/180;
   const d1=r(b.lat-a.lat),d2=r(b.lon-a.lon),h=Math.sin(d1/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(d2/2)**2;
   return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
 
+function tkVaqt(){
+  // Toshkent vaqti (UTC+5) — telefon zonasidan qat'i nazar
+  const d=new Date();
+  const tk=new Date(d.getTime()+(d.getTimezoneOffset()+300)*60000);
+  const p=n=>String(n).padStart(2,'0');
+  return tk.getFullYear()+'-'+p(tk.getMonth()+1)+'-'+p(tk.getDate())+'T'+p(tk.getHours())+':'+p(tk.getMinutes())+':'+p(tk.getSeconds());
+}
 function onPos(p){
   const now=Date.now();
-  const pt={lat:p.coords.latitude,lon:p.coords.longitude,vaqt:new Date().toISOString().slice(0,19),acc:Math.round(p.coords.accuracy||0)};
+  const pt={lat:p.coords.latitude,lon:p.coords.longitude,vaqt:tkVaqt(),acc:Math.round(p.coords.accuracy||0)};
   // throttle: 15 soniya YOKI 20 metrdan ko'p siljisa
   if(lastP && (now-lastT)<15000 && dist(lastP,pt)<20) return;
   lastP=pt; lastT=now;
@@ -68,6 +75,10 @@ async function flush(){
 async function gpsOff(sabab){
   try{ await fetch('/api/gps_off',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,sabab})}); }catch(e){}
 }
+async function ping(){
+  if(!tracking) return;
+  try{ await fetch('/api/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})}); }catch(e){}
+}
 function showWarn(t){ $('warn').textContent=t; $('warn').classList.remove('hide'); }
 function hideWarn(){ $('warn').classList.add('hide'); }
 
@@ -78,6 +89,8 @@ async function start(){
   $('info').textContent="Joylashuv olinmoqda…";
   watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
   setInterval(flush,30000);   // har 30s da yuborishga urinadi
+  setInterval(ping,60000);    // har 1 daqiqa "tirikman" signali (nuqtasiz ham)
+  ping();
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
 }
 function stop(){

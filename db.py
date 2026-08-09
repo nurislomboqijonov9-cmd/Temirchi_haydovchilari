@@ -36,6 +36,11 @@ def init_db():
         con.execute("ALTER TABLE haydovchilar ADD COLUMN share_token TEXT")
     except Exception:
         pass
+    for col in ("last_seen TEXT", "offline_xabar INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE haydovchilar ADD COLUMN {col}")
+        except Exception:
+            pass
     con.execute("""CREATE TABLE IF NOT EXISTS gps_nuqta(
         id INTEGER PRIMARY KEY AUTOINCREMENT, hid INTEGER, lat REAL, lon REAL,
         vaqt TEXT, acc REAL)""")
@@ -178,3 +183,50 @@ def gps_oxirgi(hid):
     r = con.execute("SELECT lat,lon,vaqt,acc FROM gps_nuqta WHERE hid=? ORDER BY vaqt DESC LIMIT 1", (hid,)).fetchone()
     con.close()
     return dict(r) if r else None
+
+
+# ---------------- Faollik (heartbeat) ----------------
+def haydovchi_seen(hid):
+    """Signal keldi: oxirgi ko'rinishni yangilaydi, offline belgisini oladi."""
+    con = _con()
+    con.execute("UPDATE haydovchilar SET last_seen=?, offline_xabar=0 WHERE id=?",
+                (now_tk().isoformat(), hid))
+    con.commit()
+    con.close()
+
+
+def haydovchi_offline_belgila(hid):
+    con = _con()
+    con.execute("UPDATE haydovchilar SET offline_xabar=1 WHERE id=?", (hid,))
+    con.commit()
+    con.close()
+
+
+def haydovchi_online(hid, daqiqa=5):
+    h = haydovchi_get(hid)
+    if not h or not h.get("last_seen"):
+        return False
+    try:
+        d = (now_tk() - datetime.fromisoformat(h["last_seen"])).total_seconds() / 60
+        return d <= daqiqa
+    except Exception:
+        return False
+
+
+def last_seen_daqiqa(last_seen):
+    if not last_seen:
+        return None
+    try:
+        return (now_tk() - datetime.fromisoformat(last_seen)).total_seconds() / 60
+    except Exception:
+        return None
+
+
+def gps_age_daqiqa(vaqt):
+    """GPS nuqta vaqti (Toshkent, naive) dan hozirgacha necha daqiqa."""
+    try:
+        d = datetime.fromisoformat(str(vaqt)[:19])
+        now = now_tk().replace(tzinfo=None)
+        return (now - d).total_seconds() / 60
+    except Exception:
+        return None

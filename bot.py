@@ -75,6 +75,27 @@ async def otchot(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _hisobot_yubor(ctx.bot, update.effective_chat.id)
 
 
+async def offline_loop(app):
+    """Har daqiqa: 5 daqiqa signal bo'lmagan (ilova yopilgan) haydovchini topib, egaga xabar."""
+    while True:
+        try:
+            if OWNER_ID:
+                for h in db.haydovchilar():
+                    ls = db.last_seen_daqiqa(h.get("last_seen"))
+                    # yaqinda faol edi-yu, endi 5-60 daqiqa signal yo'q -> bir marta xabar
+                    if ls is not None and 5 <= ls <= 60 and not h.get("offline_xabar"):
+                        oxirgi = (h.get("last_seen") or "")[11:16]
+                        await app.bot.send_message(
+                            OWNER_ID,
+                            f"🔴 *{h['ism']}* — ilova yopildi / aloqa yo'q\n"
+                            f"Oxirgi signal: {oxirgi} ({round(ls)} daqiqa oldin)",
+                            parse_mode="Markdown")
+                        db.haydovchi_offline_belgila(h["id"])
+        except Exception:
+            log.exception("offline_loop xato")
+        await asyncio.sleep(60)
+
+
 async def hisobot_loop(app):
     """Har kuni REPORT_HOUR:00 da egaga avtomat hisobot."""
     yuborilgan = None
@@ -114,6 +135,7 @@ async def run():
 
     await app.updater.start_polling()
     asyncio.create_task(hisobot_loop(app))
+    asyncio.create_task(offline_loop(app))
     log.info("GPS bot + panel ishga tushdi (port %s).", port)
     await asyncio.Event().wait()
 

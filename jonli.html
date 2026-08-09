@@ -42,7 +42,7 @@ async function tik(){
     document.getElementById('nm').textContent=x.ism||'Haydovchi';
     if(!x.nuqta){ document.getElementById('st').textContent="Hozircha joylashuv yo'q"; document.getElementById('msg').style.display='block'; document.getElementById('msg').textContent='Haydovchi hali kuzatuvni yoqmagan.'; return; }
     document.getElementById('msg').style.display='none';
-    const p=x.nuqta, ll=[p.lat,p.lon], m=Math.round(farq(p.vaqt));
+    const p=x.nuqta, ll=[p.lat,p.lon], m=(x.daqiqa_oldin!=null?x.daqiqa_oldin:Math.round(farq(p.vaqt)));
     const vt=(p.vaqt||'').slice(11,16);
     document.getElementById('st').innerHTML = m<=2 ? "🟢 <b>Hozir yo'lda</b> · yangilandi "+vt
       : "⏱ Oxirgi joylashuv: <b>"+vt+"</b> ("+m+" daqiqa oldin)";

@@ -58,8 +58,10 @@ async function yukla(){
     if(!L.length){ el.innerHTML='<div class="empty">Haydovchi yo\'q. Yuqoridan qo\'shing.</div>'; return; }
     el.innerHTML=L.map(h=>{
       const bor=h.nuqta>0;
+      const holat = h.online ? '<span style="color:#39d98a">🟢 faol</span>'
+                   : (h.last_daq!=null ? '<span style="color:#e06a6a">🔴 aloqa yo\'q ('+h.last_daq+' daq)</span>' : '<span style="color:#7a8c94">— ulanmagan</span>');
       return '<div class="hrow"><div style="flex:1">'
-        +'<div class="nom">'+esc(h.ism)+(bor?'<span class="tag">bugun faol</span>':'')+'</div>'
+        +'<div class="nom">'+esc(h.ism)+' &nbsp;'+holat+'</div>'
         +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')+'</div></div>'
         +'<div class="row">'
         +'<button class="mini" onclick="jonli('+h.id+')" title="Mijozga jonli havola">📍</button>'
@@ -110,4 +112,5 @@ async function jonli(id){
   catch(e){ toast('❌ '+e.message); }
 }
 yukla();
+setInterval(yukla,30000);  // holat (🟢/🔴) avtomat yangilanadi
 </script></body></html>

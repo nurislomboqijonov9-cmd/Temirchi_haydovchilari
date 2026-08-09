@@ -123,7 +123,20 @@ def make_web_app(bot_token):
         if not h:
             return web.json_response({"ok": False, "xato": "token"}, status=404)
         n = db.gps_qosh(h["id"], b.get("points") or [])
+        db.haydovchi_seen(h["id"])
         return web.json_response({"ok": True, "saqlandi": n})
+
+    async def api_ping(request):
+        """Heartbeat: ilova ochiqligini bildiradi (nuqtasiz ham)."""
+        try:
+            b = await request.json()
+        except Exception:
+            return web.json_response({"ok": False}, status=400)
+        h = db.haydovchi_by_token(b.get("token") or "")
+        if not h:
+            return web.json_response({"ok": False}, status=404)
+        db.haydovchi_seen(h["id"])
+        return web.json_response({"ok": True})
 
     async def api_gps_off(request):
         try:
@@ -146,9 +159,12 @@ def make_web_app(bot_token):
         out = []
         for h in db.haydovchilar():
             x = db.kunlik_xulosa(h["id"], sana)
+            ls = db.last_seen_daqiqa(h.get("last_seen"))
             out.append({"id": h["id"], "ism": h["ism"], "tel": h.get("tel"),
                         "token": h.get("kuzat_token"), "km": x["km"],
-                        "toxtash": len(x["toxtashlar"]), "nuqta": x["soni"], "ish": x["ish_vaqti"]})
+                        "toxtash": len(x["toxtashlar"]), "nuqta": x["soni"], "ish": x["ish_vaqti"],
+                        "online": (ls is not None and ls <= 5),
+                        "last_daq": (round(ls) if ls is not None else None)})
         return web.json_response({"haydovchilar": out})
 
     async def api_haydovchi_qosh(request):
@@ -222,13 +238,16 @@ def make_web_app(bot_token):
         if not h:
             return web.json_response({"xato": "topilmadi"}, status=404)
         p = db.gps_oxirgi(h["id"])
-        return web.json_response({"ism": h["ism"], "nuqta": p})
+        age = db.gps_age_daqiqa(p["vaqt"]) if p else None
+        return web.json_response({"ism": h["ism"], "nuqta": p,
+                                  "daqiqa_oldin": (round(age) if age is not None else None)})
 
     app.router.add_get("/", panel)
     app.router.add_get("/kuzat/{token}", kuzat)
     app.router.add_get("/harita", harita)
     app.router.add_get("/manifest.json", manifest)
     app.router.add_post("/api/gps", api_gps)
+    app.router.add_post("/api/ping", api_ping)
     app.router.add_post("/api/gps_off", api_gps_off)
     app.router.add_get("/api/haydovchilar", api_haydovchilar)
     app.router.add_post("/api/haydovchi_qosh", api_haydovchi_qosh)
