@@ -339,7 +339,7 @@ def make_web_app(bot_token):
 
     app.router.add_get("/", panel)
     app.router.add_get("/kuzat", kuzat_kirish)
-    app.router.add_get("/kuzat/{token}", kuzat)
+    app.router.add_get("/kuzat/{token}", kuzat_kirish)
     app.router.add_post("/api/kirish", api_kirish)
     app.router.add_get("/manifest-hayd.json", manifest_hayd)
     app.router.add_get("/harita", harita)
