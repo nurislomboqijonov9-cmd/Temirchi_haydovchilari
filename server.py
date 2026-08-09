@@ -13,9 +13,9 @@ def validate_init_data(init_data, bot_token):
 
 
 def _validate_debug(init_data, bot_token):
-    """initData ni tekshiradi -> (uid|None, debug_info)."""
+    """initData ni tekshiradi (signature bilan ham, siz ham) -> (uid|None, info)."""
     info = {"init_bormi": bool(init_data), "keys": [], "sig_bormi": False,
-            "hash_bormi": False, "hash_mos": False, "sabab": ""}
+            "hash_bormi": False, "hash_mos": False, "usul": "", "sabab": ""}
     try:
         if not init_data:
             info["sabab"] = "initData yo'q"
@@ -25,11 +25,19 @@ def _validate_debug(init_data, bot_token):
         info["sig_bormi"] = "signature" in data
         got = data.pop("hash", "")
         info["hash_bormi"] = bool(got)
-        data.pop("signature", None)
-        chk = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
         secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-        calc = hmac.new(secret, chk.encode(), hashlib.sha256).hexdigest()
-        info["hash_mos"] = hmac.compare_digest(calc, got)
+
+        def _hmac(d):
+            chk = "\n".join(f"{k}={v}" for k, v in sorted(d.items()))
+            return hmac.new(secret, chk.encode(), hashlib.sha256).hexdigest()
+
+        # Usul A: signature CHIQARILGAN
+        dA = {k: v for k, v in data.items() if k != "signature"}
+        # Usul B: signature QO'SHILGAN (hamma maydon)
+        okA = hmac.compare_digest(_hmac(dA), got)
+        okB = hmac.compare_digest(_hmac(data), got)
+        info["hash_mos"] = okA or okB
+        info["usul"] = "A(sig chiqarilgan)" if okA else ("B(sig qo'shilgan)" if okB else "hech biri")
         if not info["hash_mos"]:
             info["sabab"] = "hash mos emas (BOT_TOKEN boshqa bot?)"
             return None, info
@@ -191,6 +199,7 @@ def make_web_app(bot_token):
             "is_owner": bool(uid and (not db.OWNER_ID or uid == db.OWNER_ID)),
             "init_bormi": info["init_bormi"], "keys": info["keys"],
             "sig_bormi": info["sig_bormi"], "hash_mos": info["hash_mos"],
+            "usul": info.get("usul", ""),
             "sabab": info["sabab"], "bot_id": (bot_token.split(":")[0] if bot_token else None)})
 
     async def api_haydovchi_share(request):

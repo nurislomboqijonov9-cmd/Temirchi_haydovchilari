@@ -74,7 +74,7 @@ async function yukla(){
       const w=await api('/api/whoami');
       if(!w.is_owner){
         if(!w.uid && !w.init_bormi) msg='<div class="empty">⚠️ initData yo\'q. Botda /start → «🗺 Panel» tugmasidan oching.</div>';
-        else if(!w.uid) msg='<div class="empty" style="text-align:left;line-height:1.8;font-size:12.5px">⚠️ <b>Tekshiruvdan o\'tmadi</b><br>Sabab: <b style="color:#f0c674">'+esc(w.sabab||'')+'</b><br>Bot ID (BOT_TOKEN): <b>'+esc(''+w.bot_id)+'</b><br>signature keldi: <b>'+w.sig_bormi+'</b> · hash mos: <b>'+w.hash_mos+'</b><br>Maydonlar: '+esc((w.keys||[]).join(", "))+'</div>';
+        else if(!w.uid) msg='<div class="empty" style="text-align:left;line-height:1.8;font-size:12.5px">⚠️ <b>Tekshiruvdan o\'tmadi</b><br>Sabab: <b style="color:#f0c674">'+esc(w.sabab||'')+'</b><br>Bot ID (BOT_TOKEN): <b>'+esc(''+w.bot_id)+'</b><br>Usul: <b>'+esc(w.usul||'')+'</b> · hash mos: <b>'+w.hash_mos+'</b><br>Maydonlar: '+esc((w.keys||[]).join(", "))+'</div>';
         else msg='<div class="empty" style="text-align:left;line-height:1.7">🔑 Ruxsat yo\'q.<br>Sizning ID: <b style="color:#39d98a">'+w.uid+'</b><br>OWNER_ID = <b>'+w.uid+'</b> qiling (hozir: <b>'+(w.owner_id||'yo\'q')+'</b>)</div>';
       }
     }catch(_){}
