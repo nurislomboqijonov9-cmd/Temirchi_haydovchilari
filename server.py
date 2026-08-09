@@ -165,6 +165,36 @@ def make_web_app(bot_token):
             return web.json_response({"xato": "ruxsat yo'q"}, status=401)
         return web.json_response({"tok": make_token(uid, bot_token)})
 
+    async def api_whoami(request):
+        """Diagnostika: sizning Telegram ID + OWNER_ID sozlamasi."""
+        uid = validate_init_data(request.headers.get("X-Init-Data", ""), bot_token)
+        return web.json_response({
+            "uid": uid, "owner_id": db.OWNER_ID or None,
+            "is_owner": bool(uid and (not db.OWNER_ID or uid == db.OWNER_ID)),
+            "init_bormi": bool(request.headers.get("X-Init-Data"))})
+
+    async def api_haydovchi_share(request):
+        """Ega uchun: mijozga yuboriladigan JONLI kuzatuv havolasi."""
+        if not is_owner(request):
+            return web.json_response({"xato": "ruxsat yo'q"}, status=401)
+        h = db.haydovchi_get(int(request.query.get("hid")))
+        if not h:
+            return web.json_response({"xato": "topilmadi"}, status=404)
+        tok = db.haydovchi_share_token(h["id"])
+        base = str(request.url.origin())
+        return web.json_response({"havola": f"{base}/jonli/{tok}"})
+
+    async def jonli(request):
+        return await _file("jonli.html")
+
+    async def api_jonli(request):
+        """Ochiq (mijoz uchun): haydovchining hozirgi joylashuvi."""
+        h = db.haydovchi_by_share(request.query.get("token") or "")
+        if not h:
+            return web.json_response({"xato": "topilmadi"}, status=404)
+        p = db.gps_oxirgi(h["id"])
+        return web.json_response({"ism": h["ism"], "nuqta": p})
+
     app.router.add_get("/", panel)
     app.router.add_get("/kuzat/{token}", kuzat)
     app.router.add_get("/harita", harita)
@@ -177,4 +207,8 @@ def make_web_app(bot_token):
     app.router.add_get("/api/haydovchi_kuzat", api_haydovchi_kuzat)
     app.router.add_get("/api/gps_view", api_gps_view)
     app.router.add_get("/api/token", api_owner_token)
+    app.router.add_get("/api/whoami", api_whoami)
+    app.router.add_get("/jonli/{token}", jonli)
+    app.router.add_get("/api/jonli", api_jonli)
+    app.router.add_get("/api/haydovchi_share", api_haydovchi_share)
     return app

@@ -61,11 +61,23 @@ async function yukla(){
         +'<div class="nom">'+esc(h.ism)+(bor?'<span class="tag">bugun faol</span>':'')+'</div>'
         +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')+'</div></div>'
         +'<div class="row">'
+        +'<button class="mini" onclick="jonli('+h.id+')" title="Mijozga jonli havola">📍</button>'
         +'<button class="mini" onclick="karta('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">🗺</button>'
         +'<button class="mini" onclick="havola('+h.id+')">🔗</button>'
         +'<span class="x" onclick="ochir('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">✕</span></div></div>';
     }).join('');
-  }catch(e){ document.getElementById('list').innerHTML='<div class="empty">Xato: '+e.message+'</div>'; }
+  }catch(e){
+    // Ruxsat xatosi bo'lsa — ID ni ko'rsatamiz
+    let msg='<div class="empty">Xato: '+e.message+'</div>';
+    try{
+      const w=await api('/api/whoami');
+      if(!w.is_owner){
+        if(!w.uid) msg='<div class="empty">⚠️ Ilova Telegram tugmasi orqali ochilmagan (initData yo\'q). Botda /start bosib, «🗺 Panel» tugmasidan oching.</div>';
+        else msg='<div class="empty" style="text-align:left;line-height:1.7">🔑 <b>Ruxsat yo\'q.</b><br>Sizning Telegram ID: <b style="color:#39d98a">'+w.uid+'</b><br>Railway → Variables → <b>OWNER_ID</b> = <b>'+w.uid+'</b> qiling.<br>Hozirgi OWNER_ID: <b>'+(w.owner_id||'(qo\'yilmagan)')+'</b></div>';
+      }
+    }catch(_){}
+    document.getElementById('list').innerHTML=msg;
+  }
 }
 async function qosh(){
   const ism=(document.getElementById('h_ism').value||'').trim();
@@ -86,7 +98,13 @@ function karta(id,ism){
 async function havola(id){
   try{ const d=await api('/api/haydovchi_kuzat?hid='+id);
     if(d.havola){ try{await navigator.clipboard.writeText(d.havola);}catch(e){}
-      if(tg&&tg.showPopup){try{tg.showPopup({title:'Kuzatuv havolasi',message:d.havola});}catch(e){alert(d.havola);}} else alert(d.havola); } }
+      if(tg&&tg.showPopup){try{tg.showPopup({title:'Kuzatuv havolasi (haydovchiga)',message:d.havola});}catch(e){alert(d.havola);}} else alert(d.havola); } }
+  catch(e){ toast('❌ '+e.message); }
+}
+async function jonli(id){
+  try{ const d=await api('/api/haydovchi_share?hid='+id);
+    if(d.havola){ try{await navigator.clipboard.writeText(d.havola);}catch(e){}
+      if(tg&&tg.showPopup){try{tg.showPopup({title:'📍 Jonli havola (mijozga)',message:d.havola+'\n\nBu havolani mijozga yuboring — haydovchi qayerdaligini jonli ko\'radi.'});}catch(e){alert(d.havola);}} else alert(d.havola); } }
   catch(e){ toast('❌ '+e.message); }
 }
 yukla();

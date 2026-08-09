@@ -1,0 +1,58 @@
+<!doctype html><html lang="uz"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TEMIRCHI — Jonli kuzatuv</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee}
+.bar{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#14202a}
+.bar .av{width:38px;height:38px;border-radius:50%;background:#1E7A5A;display:flex;align-items:center;justify-content:center;font-size:19px}
+.bar .nm{font-weight:800;font-size:16px}
+.bar .st{font-size:12px;color:#8aa0a8;margin-top:1px}
+.bar .st b{color:#39d98a}
+#map{height:calc(100vh - 62px);background:#223}
+.truck{font-size:30px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.pulse{width:20px;height:20px;border-radius:50%;background:#39d98a;box-shadow:0 0 0 rgba(57,217,138,.6);animation:pl 1.6s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(57,217,138,.6)}70%{box-shadow:0 0 0 22px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
+.msg{position:absolute;top:50%;left:0;right:0;text-align:center;color:#9fb4bc;z-index:500;padding:20px}
+</style></head>
+<body>
+<div class="bar">
+  <div class="av">🚚</div>
+  <div><div class="nm" id="nm">Kuzatuv…</div><div class="st" id="st">Joylashuv olinmoqda…</div></div>
+</div>
+<div style="position:relative"><div id="map"></div><div class="msg" id="msg" style="display:none"></div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const TOKEN=location.pathname.split('/').filter(Boolean).pop();
+let map=L.map('map',{zoomControl:true,attributionControl:false}).setView([41.311,69.24],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let marker=null, halq=null, birinchi=true;
+const truckIcon=L.divIcon({className:'',html:'<div class="truck">🚚</div>',iconSize:[34,34],iconAnchor:[17,17]});
+const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[20,20],iconAnchor:[10,10]});
+
+function farq(v){ // necha daqiqa oldin
+  try{ const d=(Date.now()-new Date(v.replace(' ','T')).getTime())/60000; return d; }catch(e){ return 999; }
+}
+async function tik(){
+  try{
+    const r=await fetch('/api/jonli?token='+encodeURIComponent(TOKEN)+'&_='+Date.now());
+    if(!r.ok){ document.getElementById('msg').style.display='block'; document.getElementById('msg').textContent='Havola topilmadi.'; return; }
+    const x=await r.json();
+    document.getElementById('nm').textContent=x.ism||'Haydovchi';
+    if(!x.nuqta){ document.getElementById('st').textContent="Hozircha joylashuv yo'q"; document.getElementById('msg').style.display='block'; document.getElementById('msg').textContent='Haydovchi hali kuzatuvni yoqmagan.'; return; }
+    document.getElementById('msg').style.display='none';
+    const p=x.nuqta, ll=[p.lat,p.lon], m=Math.round(farq(p.vaqt));
+    const vt=(p.vaqt||'').slice(11,16);
+    document.getElementById('st').innerHTML = m<=2 ? "🟢 <b>Hozir yo'lda</b> · yangilandi "+vt
+      : "⏱ Oxirgi joylashuv: <b>"+vt+"</b> ("+m+" daqiqa oldin)";
+    if(!marker){
+      halq=L.marker(ll,{icon:pulseIcon}).addTo(map);
+      marker=L.marker(ll,{icon:truckIcon}).addTo(map);
+    } else { marker.setLatLng(ll); halq.setLatLng(ll); }
+    if(birinchi){ map.setView(ll,15); birinchi=false; } else { map.panTo(ll,{animate:true}); }
+  }catch(e){ document.getElementById('st').textContent="Ulanish yo'q, qayta urinilmoqda…"; }
+}
+if(!TOKEN||TOKEN==='jonli'){ document.getElementById('st').textContent="Havola noto'g'ri"; }
+else { tik(); setInterval(tik,15000); }
+</script></body></html>

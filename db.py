@@ -31,7 +31,11 @@ def init_db():
     con = _con()
     con.execute("""CREATE TABLE IF NOT EXISTS haydovchilar(
         id INTEGER PRIMARY KEY AUTOINCREMENT, ism TEXT, tel TEXT,
-        kuzat_token TEXT, faol INTEGER DEFAULT 1, created TEXT)""")
+        kuzat_token TEXT, share_token TEXT, faol INTEGER DEFAULT 1, created TEXT)""")
+    try:
+        con.execute("ALTER TABLE haydovchilar ADD COLUMN share_token TEXT")
+    except Exception:
+        pass
     con.execute("""CREATE TABLE IF NOT EXISTS gps_nuqta(
         id INTEGER PRIMARY KEY AUTOINCREMENT, hid INTEGER, lat REAL, lon REAL,
         vaqt TEXT, acc REAL)""")
@@ -146,3 +150,31 @@ def kunlik_xulosa(hid, sana):
         ish = pts[0]["vaqt"][11:16] + " – " + pts[-1]["vaqt"][11:16]
     return {"nuqtalar": pts, "toxtashlar": stops, "km": round(dist / 1000, 1),
             "soni": len(pts), "ish_vaqti": ish, "toxtash_daq": sum(s["daqiqa"] for s in stops)}
+
+
+def haydovchi_share_token(hid):
+    """Mijozga yuborish uchun jonli-kuzatuv tokeni (o'qishga)."""
+    con = _con()
+    r = con.execute("SELECT share_token FROM haydovchilar WHERE id=?", (hid,)).fetchone()
+    tok = r["share_token"] if r and r["share_token"] else None
+    if not tok:
+        tok = secrets.token_urlsafe(8)
+        con.execute("UPDATE haydovchilar SET share_token=? WHERE id=?", (tok, hid))
+        con.commit()
+    con.close()
+    return tok
+
+
+def haydovchi_by_share(token):
+    con = _con()
+    r = con.execute("SELECT * FROM haydovchilar WHERE share_token=?", (token,)).fetchone()
+    con.close()
+    return dict(r) if r else None
+
+
+def gps_oxirgi(hid):
+    """Haydovchining eng oxirgi joylashuvi (jonli)."""
+    con = _con()
+    r = con.execute("SELECT lat,lon,vaqt,acc FROM gps_nuqta WHERE hid=? ORDER BY vaqt DESC LIMIT 1", (hid,)).fetchone()
+    con.close()
+    return dict(r) if r else None
