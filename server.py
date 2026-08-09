@@ -110,8 +110,21 @@ def make_web_app(bot_token):
     async def manifest(request):
         return web.json_response({
             "name": "TEMIRCHI Kuzatuv", "short_name": "Kuzatuv",
-            "start_url": ".", "display": "standalone",
-            "background_color": "#0f1720", "theme_color": "#1E7A5A", "icons": []})
+            "start_url": "./", "display": "standalone",
+            "background_color": "#0f1720", "theme_color": "#1E7A5A",
+            "icons": [
+                {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+                {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+            ]})
+
+    async def icon(request):
+        nom = request.match_info.get("nom", "")
+        if nom not in ("icon-192.png", "icon-512.png", "icon-180.png"):
+            return web.Response(status=404)
+        yol = HERE / nom
+        if not yol.exists():
+            return web.Response(status=404)
+        return web.FileResponse(yol, headers={"Cache-Control": "public, max-age=86400"})
 
     # ---------- Haydovchi (kuzat.html) ----------
     async def api_gps(request):
@@ -123,7 +136,8 @@ def make_web_app(bot_token):
         if not h:
             return web.json_response({"ok": False, "xato": "token"}, status=404)
         n = db.gps_qosh(h["id"], b.get("points") or [])
-        db.haydovchi_seen(h["id"])
+        if db.haydovchi_seen(h["id"]) and db.OWNER_ID:
+            await tg_xabar(db.OWNER_ID, f"🟢 *{h.get('ism') or 'Haydovchi'}* — qayta ulandi (davom etmoqda)")
         return web.json_response({"ok": True, "saqlandi": n})
 
     async def api_ping(request):
@@ -135,7 +149,8 @@ def make_web_app(bot_token):
         h = db.haydovchi_by_token(b.get("token") or "")
         if not h:
             return web.json_response({"ok": False}, status=404)
-        db.haydovchi_seen(h["id"])
+        if db.haydovchi_seen(h["id"]) and db.OWNER_ID:
+            await tg_xabar(db.OWNER_ID, f"🟢 *{h.get('ism') or 'Haydovchi'}* — qayta ulandi (davom etmoqda)")
         return web.json_response({"ok": True})
 
     async def api_gps_off(request):
@@ -246,6 +261,7 @@ def make_web_app(bot_token):
     app.router.add_get("/kuzat/{token}", kuzat)
     app.router.add_get("/harita", harita)
     app.router.add_get("/manifest.json", manifest)
+    app.router.add_get("/{nom:icon-\\d+\\.png}", icon)
     app.router.add_post("/api/gps", api_gps)
     app.router.add_post("/api/ping", api_ping)
     app.router.add_post("/api/gps_off", api_gps_off)

@@ -1,6 +1,9 @@
 <!doctype html><html lang="uz"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TEMIRCHI — Kuzatuv paneli</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#0f1720">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -64,7 +67,7 @@ async function yukla(){
         +'<div class="nom">'+esc(h.ism)+' &nbsp;'+holat+'</div>'
         +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')+'</div></div>'
         +'<div class="row">'
-        +'<button class="mini" onclick="jonli('+h.id+')" title="Mijozga jonli havola">📍</button>'
+        +'<button class="mini" onclick="jonli('+h.id+')" title="Jonli ko\'rish — hozir qayerda">👁</button>'
         +'<button class="mini" onclick="karta('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">🗺</button>'
         +'<button class="mini" onclick="havola('+h.id+')">🔗</button>'
         +'<span class="x" onclick="ochir('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">✕</span></div></div>';
@@ -106,9 +109,9 @@ async function havola(id){
   catch(e){ toast('❌ '+e.message); }
 }
 async function jonli(id){
+  // Eg_aning o'zi jonli ko'rishi — xaritani ilovada ochadi
   try{ const d=await api('/api/haydovchi_share?hid='+id);
-    if(d.havola){ try{await navigator.clipboard.writeText(d.havola);}catch(e){}
-      if(tg&&tg.showPopup){try{tg.showPopup({title:'📍 Jonli havola (mijozga)',message:d.havola+'\n\nBu havolani mijozga yuboring — haydovchi qayerdaligini jonli ko\'radi.'});}catch(e){alert(d.havola);}} else alert(d.havola); } }
+    if(d.havola){ if(tg&&tg.openLink){ tg.openLink(d.havola); } else window.open(d.havola,'_blank'); } }
   catch(e){ toast('❌ '+e.message); }
 }
 yukla();

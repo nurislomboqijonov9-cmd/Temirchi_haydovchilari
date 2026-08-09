@@ -19,15 +19,18 @@ body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;col
 <body>
 <div class="bar">
   <div class="av">🚚</div>
-  <div><div class="nm" id="nm">Kuzatuv…</div><div class="st" id="st">Joylashuv olinmoqda…</div></div>
+  <div style="flex:1"><div class="nm" id="nm">Kuzatuv…</div><div class="st" id="st">Joylashuv olinmoqda…</div></div>
+  <button id="share" style="background:#1E7A5A;border:none;color:#fff;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer">📤 Ulashish</button>
 </div>
 <div style="position:relative"><div id="map"></div><div class="msg" id="msg" style="display:none"></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const TOKEN=location.pathname.split('/').filter(Boolean).pop();
 let map=L.map('map',{zoomControl:true,attributionControl:false}).setView([41.311,69.24],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-let marker=null, halq=null, birinchi=true;
+const kocha=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const sputnik=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+L.control.layers({"Ko'cha":kocha,"Sputnik":sputnik},null,{position:'topright'}).addTo(map);
+let marker=null, halq=null, aylana=null, birinchi=true;
 const truckIcon=L.divIcon({className:'',html:'<div class="truck">🚚</div>',iconSize:[34,34],iconAnchor:[17,17]});
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[20,20],iconAnchor:[10,10]});
 
@@ -49,10 +52,16 @@ async function tik(){
     if(!marker){
       halq=L.marker(ll,{icon:pulseIcon}).addTo(map);
       marker=L.marker(ll,{icon:truckIcon}).addTo(map);
-    } else { marker.setLatLng(ll); halq.setLatLng(ll); }
+      aylana=L.circle(ll,{radius:p.acc||30,color:'#39d98a',weight:1,fillColor:'#39d98a',fillOpacity:.12}).addTo(map);
+    } else { marker.setLatLng(ll); halq.setLatLng(ll); if(aylana){aylana.setLatLng(ll); aylana.setRadius(p.acc||30);} }
     if(birinchi){ map.setView(ll,15); birinchi=false; } else { map.panTo(ll,{animate:true}); }
   }catch(e){ document.getElementById('st').textContent="Ulanish yo'q, qayta urinilmoqda…"; }
 }
 if(!TOKEN||TOKEN==='jonli'){ document.getElementById('st').textContent="Havola noto'g'ri"; }
 else { tik(); setInterval(tik,15000); }
+document.getElementById('share').onclick=async function(){
+  const u=location.href;
+  try{ if(navigator.share){ await navigator.share({title:'Jonli kuzatuv',url:u}); return; } }catch(e){}
+  try{ await navigator.clipboard.writeText(u); alert('✅ Havola nusxalandi — mijozga yuboring'); }catch(e){ prompt('Havola:',u); }
+};
 </script></body></html>

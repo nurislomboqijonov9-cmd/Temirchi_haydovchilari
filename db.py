@@ -187,12 +187,16 @@ def gps_oxirgi(hid):
 
 # ---------------- Faollik (heartbeat) ----------------
 def haydovchi_seen(hid):
-    """Signal keldi: oxirgi ko'rinishni yangilaydi, offline belgisini oladi."""
+    """Signal keldi: last_seen yangilanadi, offline belgisi olinadi.
+    Agar oldin offline (xabar berilgan) bo'lsa True qaytaradi (qayta ulandi)."""
     con = _con()
+    r = con.execute("SELECT offline_xabar FROM haydovchilar WHERE id=?", (hid,)).fetchone()
+    edi_offline = bool(r and r["offline_xabar"])
     con.execute("UPDATE haydovchilar SET last_seen=?, offline_xabar=0 WHERE id=?",
                 (now_tk().isoformat(), hid))
     con.commit()
     con.close()
+    return edi_offline
 
 
 def haydovchi_offline_belgila(hid):

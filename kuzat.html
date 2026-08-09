@@ -1,108 +1,145 @@
 <!doctype html><html lang="uz"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1E7A5A"><title>TEMIRCHI — Kuzatuv</title>
+<meta name="theme-color" content="#0f1720"><title>TEMIRCHI — Kuzatuv</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kuzatuv">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;text-align:center}
-.logo{font-size:22px;font-weight:800;letter-spacing:.08em;margin-bottom:6px}
-.logo b{color:#39d98a}
-.sub{color:#8aa0a8;font-size:13px;margin-bottom:26px}
-.dot{width:132px;height:132px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:52px;margin:0 auto 18px;transition:.3s;background:#14202a;border:3px solid #24333d}
-.on .dot{background:radial-gradient(circle,#1E7A5A,#124c39);border-color:#39d98a;box-shadow:0 0 0 8px rgba(57,217,138,.12),0 0 40px rgba(57,217,138,.3);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 8px rgba(57,217,138,.12),0 0 30px rgba(57,217,138,.25)}50%{box-shadow:0 0 0 14px rgba(57,217,138,.05),0 0 50px rgba(57,217,138,.4)}}
-.st{font-size:20px;font-weight:700;margin-bottom:6px}
-.info{color:#8aa0a8;font-size:13px;line-height:1.9;margin-bottom:24px}
-.info b{color:#cfe}
-.btn{width:100%;max-width:340px;padding:16px;border:none;border-radius:14px;font-size:17px;font-weight:700;cursor:pointer;color:#fff}
+body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;color:#eaf2ee;overflow:hidden}
+#map{position:fixed;inset:0;z-index:1;background:#223}
+.top{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:12px 14px;
+  background:linear-gradient(#0f1720ee,#0f1720aa,transparent)}
+.logo{width:36px;height:36px;border-radius:9px;background:#16294A;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.tt{font-weight:800;font-size:15px;letter-spacing:.03em}
+.tt b{color:#39d98a}
+.acc{margin-left:auto;font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;background:#16232e;border:1px solid #24333d}
+.card{position:fixed;left:12px;right:12px;bottom:14px;z-index:10;background:#16232eef;backdrop-filter:blur(8px);
+  border:1px solid #24333d;border-radius:16px;padding:14px 16px;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.stat{display:flex;justify-content:space-around;text-align:center;margin-bottom:12px}
+.stat .v{font-size:19px;font-weight:800}.stat .l{font-size:11px;color:#8aa0a8;margin-top:2px}
+.stat .v.on{color:#39d98a}
+.btn{width:100%;padding:15px;border:none;border-radius:13px;font-size:16px;font-weight:800;cursor:pointer;color:#fff}
 .start{background:#1E7A5A}.stop{background:#c0392b}
-.warn{background:#3a2a12;border:1px solid #a06a1e;color:#f0c674;padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:18px;max-width:340px;line-height:1.5}
-.hide{display:none}
-.foot{margin-top:26px;color:#5a6b73;font-size:11px;line-height:1.6}
+.warn{position:fixed;top:60px;left:12px;right:12px;z-index:11;background:#3a2a12;border:1px solid #a06a1e;color:#f0c674;
+  padding:11px 13px;border-radius:12px;font-size:12.5px;line-height:1.5;display:none}
+.warn button{margin-top:8px;background:#2a6df0;border:none;color:#fff;padding:8px 12px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;width:100%}
+.pin{width:18px;height:18px;border-radius:50%;background:#39d98a;border:3px solid #fff;box-shadow:0 0 0 rgba(57,217,138,.6);animation:pl 1.6s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(57,217,138,.6)}70%{box-shadow:0 0 0 18px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
 </style></head>
 <body>
-<div id="wrap">
-  <div class="logo">TEMIR<b>CHI</b></div>
-  <div class="sub">Haydovchi kuzatuvi</div>
-  <div class="dot" id="dot">📍</div>
-  <div class="st" id="st">Kuzatuv o'chiq</div>
-  <div class="info" id="info">Ishni boshlaganda tugmani bosing.</div>
-  <div class="warn hide" id="warn"></div>
-  <button class="btn start" id="btn">▶️ Kuzatuvni boshlash</button>
-  <div class="foot">Ilova ochiq turса — joylashuv avtomat yuboriladi.<br>Internet bo'lmasa ham saqlanadi, ulanganda yuboriladi.</div>
+<div id="map"></div>
+<div class="top">
+  <div class="logo">🚚</div>
+  <div><div class="tt">TEMIR<b>CHI</b></div><div style="font-size:11px;color:#8aa0a8" id="nm">Kuzatuv</div></div>
+  <div class="acc" id="acc">—</div>
 </div>
+<div class="warn" id="warn"></div>
+<div class="card">
+  <div class="stat">
+    <div><div class="v" id="s_holat">Tayyor</div><div class="l">Holat</div></div>
+    <div><div class="v" id="s_km">0.0</div><div class="l">km (bugun)</div></div>
+    <div><div class="v" id="s_vaqt">—</div><div class="l">So'nggi</div></div>
+  </div>
+  <button class="btn start" id="btn">▶️ Kuzatuvni boshlash</button>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const TOKEN=location.pathname.split('/').filter(Boolean).pop();
-const BUF='gps_buf_'+TOKEN;
+const BUF='gps_buf_'+TOKEN, ACT='gps_act_'+TOKEN;
 let watchId=null, wake=null, lastP=null, lastT=0, tracking=false;
+let map=null, marker=null, acirc=null, trail=null, tpts=[], kmSum=0, prevLL=null, birinchi=true;
 const $=id=>document.getElementById(id);
 
 function buf(){ try{return JSON.parse(localStorage.getItem(BUF)||'[]');}catch(e){return[];} }
-function setBuf(a){ try{localStorage.setItem(BUF,JSON.stringify(a.slice(-500)));}catch(e){} }
+function setBuf(a){ try{localStorage.setItem(BUF,JSON.stringify(a.slice(-800)));}catch(e){} }
 function dist(a,b){ if(!a||!b)return 1e9; const R=6371000,r=x=>x*Math.PI/180;
   const d1=r(b.lat-a.lat),d2=r(b.lon-a.lon),h=Math.sin(d1/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(d2/2)**2;
   return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
-
-function tkVaqt(){
-  // Toshkent vaqti (UTC+5) — telefon zonasidan qat'i nazar
-  const d=new Date();
-  const tk=new Date(d.getTime()+(d.getTimezoneOffset()+300)*60000);
+function tkVaqt(){ const d=new Date(); const tk=new Date(d.getTime()+(d.getTimezoneOffset()+300)*60000);
   const p=n=>String(n).padStart(2,'0');
-  return tk.getFullYear()+'-'+p(tk.getMonth()+1)+'-'+p(tk.getDate())+'T'+p(tk.getHours())+':'+p(tk.getMinutes())+':'+p(tk.getSeconds());
+  return tk.getFullYear()+'-'+p(tk.getMonth()+1)+'-'+p(tk.getDate())+'T'+p(tk.getHours())+':'+p(tk.getMinutes())+':'+p(tk.getSeconds()); }
+
+function initMap(){
+  try{
+    if(typeof L==='undefined') return;
+    map=L.map('map',{zoomControl:false,attributionControl:false}).setView([41.311,69.24],15);
+    const kocha=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    const sput=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+    L.control.layers({"Ko'cha":kocha,"Sputnik":sput},null,{position:'topright'}).addTo(map);
+    trail=L.polyline([],{color:'#39d98a',weight:5,opacity:.85}).addTo(map);
+  }catch(e){ map=null; }
+}
+function chiz(pt){
+  $('s_km').textContent=kmSum.toFixed(1);
+  $('s_vaqt').textContent=pt.vaqt.slice(11,16);
+  const ll=[pt.lat,pt.lon];
+  if(prevLL) kmSum+=dist({lat:prevLL[0],lon:prevLL[1]},pt)/1000;
+  prevLL=ll; tpts.push(ll);
+  $('s_km').textContent=kmSum.toFixed(1);
+  if(!map || typeof L==='undefined') return;  // karta yuklanmagan bo'lsa ham kuzatuv ishlaydi
+  try{
+    if(!marker){
+      marker=L.marker(ll,{icon:L.divIcon({className:'',html:'<div class="pin"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
+      acirc=L.circle(ll,{radius:pt.acc||20,color:'#39d98a',weight:1,fillColor:'#39d98a',fillOpacity:.1}).addTo(map);
+    }else{ marker.setLatLng(ll); acirc.setLatLng(ll); acirc.setRadius(pt.acc||20); }
+    if(trail) trail.setLatLngs(tpts);
+    if(birinchi){ map.setView(ll,16); birinchi=false; } else map.panTo(ll,{animate:true});
+  }catch(e){}
 }
 function onPos(p){
-  const now=Date.now();
-  const pt={lat:p.coords.latitude,lon:p.coords.longitude,vaqt:tkVaqt(),acc:Math.round(p.coords.accuracy||0)};
-  // throttle: 15 soniya YOKI 20 metrdan ko'p siljisa
-  if(lastP && (now-lastT)<15000 && dist(lastP,pt)<20) return;
+  const now=Date.now(); const acc=Math.round(p.coords.accuracy||0);
+  const rang=acc<=30?'#39d98a':(acc<=100?'#f0c674':'#e06a6a');
+  $('acc').innerHTML="<span style='color:"+rang+"'>● "+acc+" m</span>";
+  if(acc>150){ return; }  // tarmoq joylashuvi — chizmaymiz
+  const pt={lat:p.coords.latitude,lon:p.coords.longitude,vaqt:tkVaqt(),acc:acc};
+  if(lastP && (now-lastT)<15000 && dist(lastP,pt)<20){ return; }
   lastP=pt; lastT=now;
   const a=buf(); a.push(pt); setBuf(a);
-  $('info').innerHTML="So'nggi: <b>"+pt.vaqt.slice(11,16)+"</b> · aniqlik <b>"+pt.acc+" m</b><br>Yuborilmagan: <b>"+a.length+"</b>";
-  hideWarn();
-  flush();
+  chiz(pt); hideWarn(); flush();
 }
 function onErr(e){
-  if(e.code===1){ showWarn("⚠️ Joylashuvga ruxsat berilmagan. Sozlamalardan yoqing."); gpsOff("Ruxsat berilmadi"); }
-  else if(e.code===2){ showWarn("⚠️ GPS signal yo'q yoki o'chirilgan."); gpsOff("GPS signal yo'q"); }
+  if(e.code===1){ showWarn("⚠️ Joylashuvga ruxsat berilmagan. Sozlamalardan yoqing.",false); gpsOff("Ruxsat berilmadi"); }
+  else if(e.code===2){ showWarn("⚠️ GPS signal yo'q. Ochiq joyga chiqing.",false); gpsOff("GPS signal yo'q"); }
 }
-async function flush(){
-  const a=buf(); if(!a.length) return;
-  try{
-    const r=await fetch('/api/gps',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({token:TOKEN,points:a})});
-    if(r.ok){ setBuf([]); }   // yuborildi — buferni tozalaymiz
-  }catch(e){ /* internet yo'q — keyin urinadi */ }
-}
-async function gpsOff(sabab){
-  try{ await fetch('/api/gps_off',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,sabab})}); }catch(e){}
-}
-async function ping(){
-  if(!tracking) return;
-  try{ await fetch('/api/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})}); }catch(e){}
-}
-function showWarn(t){ $('warn').textContent=t; $('warn').classList.remove('hide'); }
-function hideWarn(){ $('warn').classList.add('hide'); }
+async function flush(){ const a=buf(); if(!a.length) return;
+  try{ const r=await fetch('/api/gps',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,points:a})}); if(r.ok) setBuf([]); }catch(e){} }
+async function ping(){ if(!tracking) return; try{ await fetch('/api/ping',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN})}); }catch(e){} }
+async function gpsOff(sabab){ try{ await fetch('/api/gps_off',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:TOKEN,sabab})}); }catch(e){} }
+function showWarn(t,btn){ $('warn').innerHTML=t+(btn?'<button onclick="ochBrauzer()">🌐 Chrome / brauzerda ochish</button>':''); $('warn').style.display='block'; }
+function hideWarn(){ $('warn').style.display='none'; }
+function ochBrauzer(){ try{ if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openLink){ Telegram.WebApp.openLink(location.href); return;} }catch(e){} window.open(location.href,'_system')||window.open(location.href,'_blank'); }
 
 async function start(){
-  if(!navigator.geolocation){ showWarn("Bu qurilmada GPS yo'q."); return; }
-  tracking=true; document.body.classList.add('on');
-  $('st').textContent="Kuzatuv yoniq ✅"; $('btn').textContent="⏹ To'xtatish"; $('btn').className="btn stop";
-  $('info').textContent="Joylashuv olinmoqda…";
-  watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
-  setInterval(flush,30000);   // har 30s da yuborishga urinadi
-  setInterval(ping,60000);    // har 1 daqiqa "tirikman" signali (nuqtasiz ham)
+  if(!navigator.geolocation){ showWarn("Bu qurilmada GPS yo'q.",false); return; }
+  tracking=true; try{localStorage.setItem(ACT,'1');}catch(e){}
+  $('s_holat').textContent="Yoniq"; $('s_holat').className="v on";
+  $('btn').textContent="⏹ To'xtatish"; $('btn').className="btn stop";
+  watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  if(!window._iv){ window._iv=true; setInterval(flush,30000); setInterval(ping,60000); }
   ping();
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
 }
 function stop(){
-  tracking=false; document.body.classList.remove('on');
+  tracking=false; try{localStorage.removeItem(ACT);}catch(e){}
   if(watchId!=null) navigator.geolocation.clearWatch(watchId);
   try{ wake&&wake.release&&wake.release(); }catch(e){}
-  $('st').textContent="Kuzatuv o'chiq"; $('btn').textContent="▶️ Kuzatuvni boshlash"; $('btn').className="btn start";
-  $('info').textContent="Ishni boshlaganda tugmani bosing."; flush();
+  $('s_holat').textContent="To'xtadi"; $('s_holat').className="v";
+  $('btn').textContent="▶️ Kuzatuvni boshlash"; $('btn').className="btn start"; flush();
 }
 $('btn').onclick=()=>{ tracking?stop():start(); };
-// ekran qайta yoniqда wakelock tiklash
 document.addEventListener('visibilitychange',async()=>{ if(tracking&&document.visibilityState==='visible'){ try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){} flush(); } });
 window.addEventListener('online',flush);
-if(!TOKEN||TOKEN==='kuzat'){ $('st').textContent="Havola noto'g'ri"; $('btn').classList.add('hide'); }
+
+initMap();
+// Ilova nomini olamiz (share token orqali emas — shunchaki ko'rinish uchun)
+// Telegram brauzeri bo'lsa — Chrome tavsiyasi
+(function(){ const inTg=/Telegram/i.test(navigator.userAgent)||!!(window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData);
+  if(inTg) showWarn("Aniq GPS uchun CHROME'da oching (Telegram brauzerida joylashuv noaniq).",true); })();
+// Avval yoqilgan bo'lsa — avtomat davom ettiramiz (o'chib qolmasin)
+try{ if(localStorage.getItem(ACT)==='1') start(); }catch(e){}
+if(!TOKEN||TOKEN==='kuzat'){ $('s_holat').textContent="Havola xato"; $('btn').style.display='none'; }
 </script></body></html>
