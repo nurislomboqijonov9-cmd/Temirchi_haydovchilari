@@ -72,7 +72,8 @@ async function yukla(){
     try{
       const w=await api('/api/whoami');
       if(!w.is_owner){
-        if(!w.uid) msg='<div class="empty">⚠️ Ilova Telegram tugmasi orqali ochilmagan (initData yo\'q). Botda /start bosib, «🗺 Panel» tugmasidan oching.</div>';
+        if(!w.uid && !w.init_bormi) msg='<div class="empty">⚠️ Ilova Telegram tugmasi orqali ochilmagan (initData yo\'q). Botda /start bosib, «🗺 Panel» tugmasidan oching.</div>';
+        else if(!w.uid && w.init_bormi) msg='<div class="empty">⚠️ initData bor, lekin tekshiruvdan o\'tmadi. BOT_TOKEN shu botga tegishli ekanini tekshiring.</div>';
         else msg='<div class="empty" style="text-align:left;line-height:1.7">🔑 <b>Ruxsat yo\'q.</b><br>Sizning Telegram ID: <b style="color:#39d98a">'+w.uid+'</b><br>Railway → Variables → <b>OWNER_ID</b> = <b>'+w.uid+'</b> qiling.<br>Hozirgi OWNER_ID: <b>'+(w.owner_id||'(qo\'yilmagan)')+'</b></div>';
       }
     }catch(_){}

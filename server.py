@@ -13,6 +13,7 @@ def validate_init_data(init_data, bot_token):
         pairs = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
         data = dict(pairs)
         got = data.pop("hash", "")
+        data.pop("signature", None)   # Telegram yangi maydoni — HMAC hisobiga kirmasligi kerak
         chk = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
         secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
         calc = hmac.new(secret, chk.encode(), hashlib.sha256).hexdigest()
