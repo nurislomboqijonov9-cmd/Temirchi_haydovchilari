@@ -40,11 +40,13 @@ body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;col
 <div class="warn" id="warn"></div>
 <div class="card">
   <div class="stat">
-    <div><div class="v" id="s_holat">Tayyor</div><div class="l">Holat</div></div>
+    <div><div class="v on" id="s_holat">Yoniq</div><div class="l">Holat</div></div>
     <div><div class="v" id="s_km">0.0</div><div class="l">km (bugun)</div></div>
     <div><div class="v" id="s_vaqt">—</div><div class="l">So'nggi</div></div>
   </div>
-  <button class="btn start" id="btn">▶️ Kuzatuvni boshlash</button>
+  <div style="text-align:center;padding:10px;border-radius:12px;background:#0f2a20;color:#39d98a;font-weight:700;font-size:14px">
+    🔒 Ish rejimi — kuzatuv doimiy yoniq
+  </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -117,29 +119,39 @@ async function start(){
   if(!navigator.geolocation){ showWarn("Bu qurilmada GPS yo'q.",false); return; }
   tracking=true; try{localStorage.setItem(ACT,'1');}catch(e){}
   $('s_holat').textContent="Yoniq"; $('s_holat').className="v on";
-  $('btn').textContent="⏹ To'xtatish"; $('btn').className="btn stop";
+  if(watchId!=null) navigator.geolocation.clearWatch(watchId);
   watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
   if(!window._iv){ window._iv=true; setInterval(flush,30000); setInterval(ping,60000); }
   ping();
   try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){}
 }
-function stop(){
+// Rahbar uchun yashirin to'xtatish: logoni 3 soniya bosib turing
+let _hold=null;
+function stopSorov(){
+  if(!confirm("RAHBAR uchun: kuzatuvni to'xtatasizmi? (Haydovchi buni bosmasin)")) return;
   tracking=false; try{localStorage.removeItem(ACT);}catch(e){}
   if(watchId!=null) navigator.geolocation.clearWatch(watchId);
   try{ wake&&wake.release&&wake.release(); }catch(e){}
-  $('s_holat').textContent="To'xtadi"; $('s_holat').className="v";
-  $('btn').textContent="▶️ Kuzatuvni boshlash"; $('btn').className="btn start"; flush();
+  $('s_holat').textContent="To'xtadi"; $('s_holat').className="v"; flush();
+  alert("Kuzatuv to'xtatildi.");
 }
-$('btn').onclick=()=>{ tracking?stop():start(); };
 document.addEventListener('visibilitychange',async()=>{ if(tracking&&document.visibilityState==='visible'){ try{ if('wakeLock' in navigator) wake=await navigator.wakeLock.request('screen'); }catch(e){} flush(); } });
 window.addEventListener('online',flush);
 
 initMap();
-// Ilova nomini olamiz (share token orqali emas — shunchaki ko'rinish uchun)
+// Rahbar uchun yashirin to'xtatish — logoni 3 soniya bosib turish
+(function(){ const lg=document.querySelector('.logo');
+  if(lg){ lg.addEventListener('touchstart',()=>{ _hold=setTimeout(stopSorov,3000); });
+    lg.addEventListener('touchend',()=>{ clearTimeout(_hold); });
+    lg.addEventListener('mousedown',()=>{ _hold=setTimeout(stopSorov,3000); });
+    lg.addEventListener('mouseup',()=>{ clearTimeout(_hold); }); }
+})();
+// Chiqmoqchi bo'lsa — ogohlantirish (ish telefoni)
+window.addEventListener('beforeunload',(e)=>{ if(tracking){ e.preventDefault(); e.returnValue="Bu ish telefoni. Chiqish uchun rahbardan ruxsat oling."; return e.returnValue; } });
 // Telegram brauzeri bo'lsa — Chrome tavsiyasi
 (function(){ const inTg=/Telegram/i.test(navigator.userAgent)||!!(window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData);
   if(inTg) showWarn("Aniq GPS uchun CHROME'da oching (Telegram brauzerida joylashuv noaniq).",true); })();
-// Avval yoqilgan bo'lsa — avtomat davom ettiramiz (o'chib qolmasin)
-try{ if(localStorage.getItem(ACT)==='1') start(); }catch(e){}
-if(!TOKEN||TOKEN==='kuzat'){ $('s_holat').textContent="Havola xato"; $('btn').style.display='none'; }
+// DOIMIY: ochilishi bilan avtomat yonadi (start tugmasi yo'q)
+if(!TOKEN||TOKEN==='kuzat'){ $('s_holat').textContent="Havola xato"; }
+else { start(); }
 </script></body></html>
