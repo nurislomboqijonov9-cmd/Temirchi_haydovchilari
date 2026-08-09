@@ -65,7 +65,8 @@ async function yukla(){
                    : (h.last_daq!=null ? '<span style="color:#e06a6a">🔴 aloqa yo\'q ('+h.last_daq+' daq)</span>' : '<span style="color:#7a8c94">— ulanmagan</span>');
       return '<div class="hrow"><div style="flex:1">'
         +'<div class="nom">'+esc(h.ism)+' &nbsp;'+holat+'</div>'
-        +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')+'</div></div>'
+        +'<div class="sub">'+(bor?('📏 <b>'+h.km+' km</b> · 🛑 '+h.toxtash+' · '+esc(h.ish)):'bugun ma\'lumot yo\'q')
+          +(h.kod?(' · 🔑 kod: <b style="color:#39d98a">'+esc(h.kod)+'</b>'):'')+'</div></div>'
         +'<div class="row">'
         +'<button class="mini" onclick="jonli('+h.id+')" title="Jonli ko\'rish — hozir qayerda">👁</button>'
         +'<button class="mini" onclick="karta('+h.id+',\''+esc(h.ism).replace(/'/g,"")+'\')">🗺</button>'

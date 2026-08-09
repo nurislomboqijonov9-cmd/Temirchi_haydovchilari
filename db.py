@@ -45,20 +45,54 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, hid INTEGER, lat REAL, lon REAL,
         vaqt TEXT, acc REAL)""")
     con.execute("CREATE INDEX IF NOT EXISTS ix_gps ON gps_nuqta(hid, vaqt)")
+    try:
+        con.execute("ALTER TABLE haydovchilar ADD COLUMN kod TEXT")
+    except Exception:
+        pass
     con.commit()
     con.close()
 
 
 # ---------------- Haydovchilar ----------------
+def _yangi_kod(con):
+    import random
+    for _ in range(50):
+        k = str(random.randint(100000, 999999))
+        if not con.execute("SELECT 1 FROM haydovchilar WHERE kod=?", (k,)).fetchone():
+            return k
+    return str(random.randint(100000, 999999))
+
+
 def haydovchi_qosh(ism, tel=None):
     con = _con()
     tok = secrets.token_urlsafe(10)
-    cur = con.execute("INSERT INTO haydovchilar(ism,tel,kuzat_token,faol,created) VALUES(?,?,?,1,?)",
-                      (ism, tel, tok, now_tk().isoformat()))
+    kod = _yangi_kod(con)
+    cur = con.execute("INSERT INTO haydovchilar(ism,tel,kuzat_token,kod,faol,created) VALUES(?,?,?,?,1,?)",
+                      (ism, tel, tok, kod, now_tk().isoformat()))
     con.commit()
     rid = cur.lastrowid
     con.close()
     return rid
+
+
+def haydovchi_by_kod(kod):
+    con = _con()
+    r = con.execute("SELECT * FROM haydovchilar WHERE kod=? AND faol=1", (str(kod).strip(),)).fetchone()
+    con.close()
+    return dict(r) if r else None
+
+
+def haydovchi_kod(hid):
+    """Kodni oladi (eski haydovchilarda bo'lmasa yaratadi)."""
+    con = _con()
+    r = con.execute("SELECT kod FROM haydovchilar WHERE id=?", (hid,)).fetchone()
+    kod = r["kod"] if r and r["kod"] else None
+    if not kod:
+        kod = _yangi_kod(con)
+        con.execute("UPDATE haydovchilar SET kod=? WHERE id=?", (kod, hid))
+        con.commit()
+    con.close()
+    return kod
 
 
 def haydovchi_ochir(hid):

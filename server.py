@@ -71,6 +71,27 @@ def read_token(token, bot_token):
 def make_web_app(bot_token):
     app = web.Application()
 
+    def _osmand_vaqt(ts):
+        """OsmAnd timestamp (epoch/ISO) -> Toshkent naive vaqt."""
+        import datetime as _dt
+        TZ = _dt.timezone(_dt.timedelta(hours=5))
+        if ts:
+            try:
+                v = float(ts)
+                if v > 1e12:
+                    v /= 1000.0
+                return _dt.datetime.fromtimestamp(v, TZ).replace(tzinfo=None).isoformat()[:19]
+            except Exception:
+                pass
+            try:
+                d = _dt.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if d.tzinfo:
+                    d = d.astimezone(TZ).replace(tzinfo=None)
+                return d.isoformat()[:19]
+            except Exception:
+                pass
+        return db.now_tk().replace(tzinfo=None).isoformat()[:19]
+
     def owner_uid(request):
         uid = validate_init_data(request.headers.get("X-Init-Data", ""), bot_token)
         if not uid:
@@ -101,7 +122,29 @@ def make_web_app(bot_token):
     async def panel(request):
         return await _file("panel.html")
 
-    async def kuzat(request):
+    async def api_kirish(request):
+        """Haydovchi APK/brauzerda kod kiritadi -> kuzat tokenini oladi."""
+        try:
+            b = await request.json()
+        except Exception:
+            return web.json_response({"ok": False}, status=400)
+        h = db.haydovchi_by_kod(b.get("kod") or "")
+        if not h:
+            return web.json_response({"ok": False, "xato": "Kod noto'g'ri"}, status=404)
+        return web.json_response({"ok": True, "token": h["kuzat_token"], "ism": h["ism"]})
+
+    async def manifest_hayd(request):
+        return web.json_response({
+            "name": "TEMIRCHI Haydovchi", "short_name": "TEMIRCHI",
+            "start_url": "/kuzat", "display": "standalone", "orientation": "portrait",
+            "background_color": "#0f1720", "theme_color": "#0f1720",
+            "icons": [
+                {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+                {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+            ]})
+
+    async def kuzat_kirish(request):
+        """Tokensiz /kuzat — kod kiritish sahifasi (APK uchun)."""
         return await _file("kuzat.html")
 
     async def harita(request):
@@ -140,6 +183,43 @@ def make_web_app(bot_token):
             await tg_xabar(db.OWNER_ID, f"🟢 *{h.get('ism') or 'Haydovchi'}* — qayta ulandi (davom etmoqda)")
         return web.json_response({"ok": True, "saqlandi": n})
 
+    async def osmand(request):
+        """Traccar Client (OsmAnd protokoli) — fonda GPS. id = haydovchi kodi."""
+        q = dict(request.query)
+        if request.method == "POST":
+            try:
+                post = await request.post()
+                for k, v in post.items():
+                    q.setdefault(k, v)
+            except Exception:
+                pass
+        dev = (q.get("id") or q.get("deviceid") or "").strip()
+        h = db.haydovchi_by_kod(dev) or db.haydovchi_by_token(dev)
+        if not h:
+            return web.Response(status=400, text="unknown device")
+        lat = q.get("lat"); lon = q.get("lon")
+        if (lat is None or lon is None) and q.get("location"):
+            try:
+                lat, lon = q["location"].split(",")[:2]
+            except Exception:
+                pass
+        if lat is None or lon is None:
+            db.haydovchi_seen(h["id"])
+            return web.Response(status=200, text="ok")
+        try:
+            lat = float(lat); lon = float(lon)
+        except Exception:
+            return web.Response(status=200, text="ok")
+        try:
+            acc = float(q.get("accuracy") or q.get("hdop") or 0)
+        except Exception:
+            acc = 0.0
+        vaqt = _osmand_vaqt(q.get("timestamp"))
+        db.gps_qosh(h["id"], [{"lat": lat, "lon": lon, "vaqt": vaqt, "acc": acc}])
+        if db.haydovchi_seen(h["id"]) and db.OWNER_ID:
+            await tg_xabar(db.OWNER_ID, f"🟢 *{h.get('ism') or 'Haydovchi'}* — qayta ulandi (davom etmoqda)")
+        return web.Response(status=200, text="ok")
+
     async def api_ping(request):
         """Heartbeat: ilova ochiqligini bildiradi (nuqtasiz ham)."""
         try:
@@ -176,7 +256,7 @@ def make_web_app(bot_token):
             x = db.kunlik_xulosa(h["id"], sana)
             ls = db.last_seen_daqiqa(h.get("last_seen"))
             out.append({"id": h["id"], "ism": h["ism"], "tel": h.get("tel"),
-                        "token": h.get("kuzat_token"), "km": x["km"],
+                        "token": h.get("kuzat_token"), "kod": h.get("kod"), "km": x["km"],
                         "toxtash": len(x["toxtashlar"]), "nuqta": x["soni"], "ish": x["ish_vaqti"],
                         "online": (ls is not None and ls <= 5),
                         "last_daq": (round(ls) if ls is not None else None)})
@@ -258,7 +338,10 @@ def make_web_app(bot_token):
                                   "daqiqa_oldin": (round(age) if age is not None else None)})
 
     app.router.add_get("/", panel)
+    app.router.add_get("/kuzat", kuzat_kirish)
     app.router.add_get("/kuzat/{token}", kuzat)
+    app.router.add_post("/api/kirish", api_kirish)
+    app.router.add_get("/manifest-hayd.json", manifest_hayd)
     app.router.add_get("/harita", harita)
     app.router.add_get("/manifest.json", manifest)
     app.router.add_get("/{nom:icon-\\d+\\.png}", icon)
@@ -269,6 +352,8 @@ def make_web_app(bot_token):
     app.router.add_post("/api/haydovchi_qosh", api_haydovchi_qosh)
     app.router.add_post("/api/haydovchi_ochir", api_haydovchi_ochir)
     app.router.add_get("/api/haydovchi_kuzat", api_haydovchi_kuzat)
+    app.router.add_get("/osmand", osmand)
+    app.router.add_post("/osmand", osmand)
     app.router.add_get("/api/gps_view", api_gps_view)
     app.router.add_get("/api/token", api_owner_token)
     app.router.add_get("/api/whoami", api_whoami)

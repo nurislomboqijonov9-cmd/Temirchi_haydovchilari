@@ -1,7 +1,7 @@
 <!doctype html><html lang="uz"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f1720"><title>TEMIRCHI — Kuzatuv</title>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="/manifest-hayd.json">
 <link rel="apple-touch-icon" href="/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -31,6 +31,16 @@ body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;col
 @keyframes pl{0%{box-shadow:0 0 0 0 rgba(57,217,138,.6)}70%{box-shadow:0 0 0 18px rgba(57,217,138,0)}100%{box-shadow:0 0 0 0 rgba(57,217,138,0)}}
 </style></head>
 <body>
+<div id="kirish" style="position:fixed;inset:0;z-index:50;background:#0f1720;display:none;flex-direction:column;align-items:center;justify-content:center;padding:26px;text-align:center">
+  <div style="width:72px;height:72px;border-radius:18px;background:#16294A;display:flex;align-items:center;justify-content:center;font-size:34px;margin-bottom:16px">🚚</div>
+  <div style="font-size:22px;font-weight:800;letter-spacing:.04em">TEMIR<span style="color:#39d98a">CHI</span></div>
+  <div style="color:#8aa0a8;font-size:13px;margin:6px 0 22px">Haydovchi kuzatuvi</div>
+  <div style="color:#cfe;font-size:14px;margin-bottom:10px">Rahbar bergan <b>6 xonali kod</b>ni kiriting:</div>
+  <input id="kod" inputmode="numeric" maxlength="6" placeholder="______"
+    style="width:200px;text-align:center;letter-spacing:10px;font-size:26px;font-weight:800;padding:12px;border-radius:12px;border:1px solid #2a3b47;background:#0f1a22;color:#eaf2ee;margin-bottom:16px">
+  <button id="kirBtn" style="width:220px;padding:14px;border:none;border-radius:12px;background:#1E7A5A;color:#fff;font-size:16px;font-weight:800;cursor:pointer">Kirish</button>
+  <div id="kodXato" style="color:#e06a6a;font-size:13px;margin-top:12px;min-height:18px"></div>
+</div>
 <div id="map"></div>
 <div class="top">
   <div class="logo">🚚</div>
@@ -50,8 +60,13 @@ body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0f1720;col
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const TOKEN=location.pathname.split('/').filter(Boolean).pop();
-const BUF='gps_buf_'+TOKEN, ACT='gps_act_'+TOKEN;
+let TOKEN=(function(){
+  const parts=location.pathname.split('/').filter(Boolean);
+  const last=parts[parts.length-1];
+  if(last && last!=='kuzat' && last!=='kuzat.html'){ try{localStorage.setItem('hayd_token',last);}catch(e){} return last; }
+  try{ return localStorage.getItem('hayd_token')||''; }catch(e){ return ''; }
+})();
+let BUF='gps_buf_'+TOKEN, ACT='gps_act_'+TOKEN;
 let watchId=null, wake=null, lastP=null, lastT=0, tracking=false;
 let map=null, marker=null, acirc=null, trail=null, tpts=[], kmSum=0, prevLL=null, birinchi=true;
 const $=id=>document.getElementById(id);
@@ -139,19 +154,31 @@ document.addEventListener('visibilitychange',async()=>{ if(tracking&&document.vi
 window.addEventListener('online',flush);
 
 initMap();
+// Kod bilan kirish (APK / tokensiz ochilganda)
+async function kodKirish(){
+  const k=(document.getElementById('kod').value||'').trim();
+  if(k.length<6){ document.getElementById('kodXato').textContent="6 xonali kodni kiriting"; return; }
+  try{
+    const r=await fetch('/api/kirish',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kod:k})});
+    const d=await r.json();
+    if(!d.ok){ document.getElementById('kodXato').textContent=d.xato||"Kod noto'g'ri"; return; }
+    try{ localStorage.setItem('hayd_token',d.token); }catch(e){}
+    location.href='/kuzat';  // qayta yuklaymiz — endi token bor
+  }catch(e){ document.getElementById('kodXato').textContent="Ulanish yo'q"; }
+}
+document.getElementById('kirBtn').onclick=kodKirish;
+document.getElementById('kod').addEventListener('keydown',e=>{ if(e.key==='Enter') kodKirish(); });
+
 // Rahbar uchun yashirin to'xtatish — logoni 3 soniya bosib turish
 (function(){ const lg=document.querySelector('.logo');
-  if(lg){ lg.addEventListener('touchstart',()=>{ _hold=setTimeout(stopSorov,3000); });
-    lg.addEventListener('touchend',()=>{ clearTimeout(_hold); });
-    lg.addEventListener('mousedown',()=>{ _hold=setTimeout(stopSorov,3000); });
-    lg.addEventListener('mouseup',()=>{ clearTimeout(_hold); }); }
+  if(lg){ ['touchstart','mousedown'].forEach(ev=>lg.addEventListener(ev,()=>{ _hold=setTimeout(stopSorov,3000); }));
+    ['touchend','mouseup'].forEach(ev=>lg.addEventListener(ev,()=>{ clearTimeout(_hold); })); }
 })();
-// Chiqmoqchi bo'lsa — ogohlantirish (ish telefoni)
 window.addEventListener('beforeunload',(e)=>{ if(tracking){ e.preventDefault(); e.returnValue="Bu ish telefoni. Chiqish uchun rahbardan ruxsat oling."; return e.returnValue; } });
-// Telegram brauzeri bo'lsa — Chrome tavsiyasi
 (function(){ const inTg=/Telegram/i.test(navigator.userAgent)||!!(window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData);
   if(inTg) showWarn("Aniq GPS uchun CHROME'da oching (Telegram brauzerida joylashuv noaniq).",true); })();
-// DOIMIY: ochilishi bilan avtomat yonadi (start tugmasi yo'q)
-if(!TOKEN||TOKEN==='kuzat'){ $('s_holat').textContent="Havola xato"; }
+
+// TOKEN bo'lmasa — kod so'raymiz; bo'lsa — doimiy kuzatuv
+if(!TOKEN){ document.getElementById('kirish').style.display='flex'; }
 else { start(); }
 </script></body></html>
