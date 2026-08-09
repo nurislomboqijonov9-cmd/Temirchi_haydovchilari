@@ -8,21 +8,38 @@ HERE = Path(__file__).parent
 
 
 def validate_init_data(init_data, bot_token):
-    """Telegram WebApp initData ni tekshiradi -> user id (yoki None)."""
+    uid, _ = _validate_debug(init_data, bot_token)
+    return uid
+
+
+def _validate_debug(init_data, bot_token):
+    """initData ni tekshiradi -> (uid|None, debug_info)."""
+    info = {"init_bormi": bool(init_data), "keys": [], "sig_bormi": False,
+            "hash_bormi": False, "hash_mos": False, "sabab": ""}
     try:
-        pairs = urllib.parse.parse_qsl(init_data, keep_blank_values=True)
-        data = dict(pairs)
+        if not init_data:
+            info["sabab"] = "initData yo'q"
+            return None, info
+        data = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
+        info["keys"] = sorted(data.keys())
+        info["sig_bormi"] = "signature" in data
         got = data.pop("hash", "")
-        data.pop("signature", None)   # Telegram yangi maydoni — HMAC hisobiga kirmasligi kerak
+        info["hash_bormi"] = bool(got)
+        data.pop("signature", None)
         chk = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
         secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
         calc = hmac.new(secret, chk.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(calc, got):
-            return None
+        info["hash_mos"] = hmac.compare_digest(calc, got)
+        if not info["hash_mos"]:
+            info["sabab"] = "hash mos emas (BOT_TOKEN boshqa bot?)"
+            return None, info
         u = json.loads(data.get("user", "{}"))
-        return int(u.get("id")) if u.get("id") else None
-    except Exception:
-        return None
+        uid = int(u.get("id")) if u.get("id") else None
+        info["sabab"] = "ok" if uid else "user id yo'q"
+        return uid, info
+    except Exception as e:
+        info["sabab"] = f"xato: {e}"
+        return None, info
 
 
 def make_token(uid, bot_token, kun=60):
@@ -167,12 +184,14 @@ def make_web_app(bot_token):
         return web.json_response({"tok": make_token(uid, bot_token)})
 
     async def api_whoami(request):
-        """Diagnostika: sizning Telegram ID + OWNER_ID sozlamasi."""
-        uid = validate_init_data(request.headers.get("X-Init-Data", ""), bot_token)
+        """Diagnostika: Telegram ID + OWNER_ID + tekshiruv tafsiloti."""
+        uid, info = _validate_debug(request.headers.get("X-Init-Data", ""), bot_token)
         return web.json_response({
             "uid": uid, "owner_id": db.OWNER_ID or None,
             "is_owner": bool(uid and (not db.OWNER_ID or uid == db.OWNER_ID)),
-            "init_bormi": bool(request.headers.get("X-Init-Data"))})
+            "init_bormi": info["init_bormi"], "keys": info["keys"],
+            "sig_bormi": info["sig_bormi"], "hash_mos": info["hash_mos"],
+            "sabab": info["sabab"], "bot_id": (bot_token.split(":")[0] if bot_token else None)})
 
     async def api_haydovchi_share(request):
         """Ega uchun: mijozga yuboriladigan JONLI kuzatuv havolasi."""
