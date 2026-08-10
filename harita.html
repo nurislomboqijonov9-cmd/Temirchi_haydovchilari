@@ -34,7 +34,9 @@ if(Q.get('nom')) document.getElementById('nom').textContent='🚚 '+Q.get('nom')
 document.getElementById('sana').value=Q.get('sana')||new Date().toISOString().slice(0,10);
 
 let map=L.map('map',{zoomControl:true,attributionControl:false}).setView([41.311,69.24],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const kocha=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+const sputnik=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+L.control.layers({"Ko'cha":kocha,"Sputnik":sputnik},null,{position:'topright'}).addTo(map);
 let layer=L.layerGroup().addTo(map), heat=null;
 const fmt=t=>(t||'').slice(11,16);
 function kun(d){ const s=document.getElementById('sana'); const dt=new Date(s.value); dt.setDate(dt.getDate()+d); s.value=dt.toISOString().slice(0,10); yukla(); }
@@ -54,17 +56,18 @@ async function yukla(){
     (stops.length?(" ("+(soat?soat+"s ":"")+daq+"daq)"):"")+" &nbsp; 📍 <b>"+pts.length+"</b> nuqta";
   if(!pts.length) return;
 
-  // ===== ISSIQLIK KARTASI (heatmap) =====
-  const hp=pts.map(p=>[p.lat,p.lon,0.5]);
-  stops.forEach(s=>{ const w=Math.min(3,0.5+s.daqiqa/20); for(let k=0;k<Math.ceil(s.daqiqa/3);k++) hp.push([s.lat,s.lon,w]); });
-  heat=L.heatLayer(hp,{radius:28,blur:20,maxZoom:17,minOpacity:.35,
-    gradient:{0.2:'#2c7bb6',0.45:'#00ccbc',0.65:'#ffd93b',0.85:'#fb8c00',1.0:'#e53935'}}).addTo(map);
+  // ===== ISSIQLIK KARTASI (heatmap) — asosan to'xtagan joyda qizizadi =====
+  const hp=pts.map(p=>[p.lat,p.lon,0.25]);   // yurgan yo'l — yengil
+  stops.forEach(s=>{ const w=Math.min(3.5,0.8+s.daqiqa/16); for(let k=0;k<Math.ceil(s.daqiqa/2.5);k++) hp.push([s.lat,s.lon,w]); });
+  heat=L.heatLayer(hp,{radius:24,blur:18,maxZoom:17,minOpacity:.22,
+    gradient:{0.3:'#2c7bb6',0.5:'#00ccbc',0.7:'#ffd93b',0.85:'#fb8c00',1.0:'#e53935'}}).addTo(map);
 
-  // ===== Yo'l chizig'i (xira, kontekst) =====
+  // ===== Yurgan yo'l chizig'i (aniq — qora kant + oq chiziq) =====
   const line=pts.map(p=>[p.lat,p.lon]);
-  L.polyline(line,{color:'#eaf2ee',weight:2,opacity:.28}).addTo(layer);
-  L.circleMarker(line[0],{radius:6,color:'#fff',fillColor:'#2ecc71',fillOpacity:1}).bindPopup('Boshi '+fmt(pts[0].vaqt)).addTo(layer);
-  L.circleMarker(line[line.length-1],{radius:6,color:'#fff',fillColor:'#e74c3c',fillOpacity:1}).bindPopup('Oxiri '+fmt(pts[pts.length-1].vaqt)).addTo(layer);
+  L.polyline(line,{color:'#06233d',weight:8,opacity:.6}).addTo(layer);       // kant (kontrast)
+  L.polyline(line,{color:'#ffffff',weight:4,opacity:.95}).addTo(layer);      // asosiy chiziq
+  L.circleMarker(line[0],{radius:7,color:'#fff',fillColor:'#2ecc71',fillOpacity:1,weight:2}).bindPopup('▶️ Boshi '+fmt(pts[0].vaqt)).addTo(layer);
+  L.circleMarker(line[line.length-1],{radius:7,color:'#fff',fillColor:'#e74c3c',fillOpacity:1,weight:2}).bindPopup('⏹ Oxiri '+fmt(pts[pts.length-1].vaqt)).addTo(layer);
 
   // ===== To'xtashlar — tepasida necha daqiqa =====
   stops.forEach(s=>{
