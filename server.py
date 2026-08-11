@@ -262,6 +262,25 @@ def make_web_app(bot_token):
                         "last_daq": (round(ls) if ls is not None else None)})
         return web.json_response({"haydovchilar": out})
 
+    async def api_tv(request):
+        """TV dashboard uchun ochiq (kalitli) — haydovchilar + joylashuv. CORS ochiq."""
+        cors = {"Access-Control-Allow-Origin": "*"}
+        kalit = os.environ.get("TV_KEY")
+        if kalit and request.query.get("k") != kalit:
+            return web.json_response({"xato": "ruxsat yo'q"}, status=403, headers=cors)
+        sana = db.today_tk().isoformat()
+        out = []
+        for h in db.haydovchilar():
+            x = db.kunlik_xulosa(h["id"], sana)
+            ls = db.last_seen_daqiqa(h.get("last_seen"))
+            p = db.gps_oxirgi(h["id"])
+            out.append({"ism": h["ism"], "km": x["km"], "toxtash": len(x["toxtashlar"]),
+                        "online": (ls is not None and ls <= 5),
+                        "last_daq": (round(ls) if ls is not None else None),
+                        "lat": (p["lat"] if p else None), "lon": (p["lon"] if p else None),
+                        "vaqt": (p["vaqt"][11:16] if p and p.get("vaqt") else None)})
+        return web.json_response({"haydovchilar": out}, headers=cors)
+
     async def api_haydovchi_qosh(request):
         if not is_owner(request):
             return web.json_response({"xato": "ruxsat yo'q"}, status=401)
@@ -349,6 +368,7 @@ def make_web_app(bot_token):
     app.router.add_post("/api/ping", api_ping)
     app.router.add_post("/api/gps_off", api_gps_off)
     app.router.add_get("/api/haydovchilar", api_haydovchilar)
+    app.router.add_get("/api/tv", api_tv)
     app.router.add_post("/api/haydovchi_qosh", api_haydovchi_qosh)
     app.router.add_post("/api/haydovchi_ochir", api_haydovchi_ochir)
     app.router.add_get("/api/haydovchi_kuzat", api_haydovchi_kuzat)
