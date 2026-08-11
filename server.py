@@ -274,12 +274,28 @@ def make_web_app(bot_token):
             x = db.kunlik_xulosa(h["id"], sana)
             ls = db.last_seen_daqiqa(h.get("last_seen"))
             p = db.gps_oxirgi(h["id"])
-            out.append({"ism": h["ism"], "km": x["km"], "toxtash": len(x["toxtashlar"]),
+            out.append({"id": h["id"], "ism": h["ism"], "km": x["km"], "toxtash": len(x["toxtashlar"]),
                         "online": (ls is not None and ls <= 5),
                         "last_daq": (round(ls) if ls is not None else None),
                         "lat": (p["lat"] if p else None), "lon": (p["lon"] if p else None),
                         "vaqt": (p["vaqt"][11:16] if p and p.get("vaqt") else None)})
         return web.json_response({"haydovchilar": out}, headers=cors)
+
+    async def api_tv_marshrut(request):
+        """TV uchun — bitta haydovchining kunlik marshruti (ochiq, CORS)."""
+        cors = {"Access-Control-Allow-Origin": "*"}
+        kalit = os.environ.get("TV_KEY")
+        if kalit and request.query.get("k") != kalit:
+            return web.json_response({"xato": "ruxsat yo'q"}, status=403, headers=cors)
+        try:
+            hid = int(request.query.get("id"))
+        except Exception:
+            return web.json_response({"xato": "id kerak"}, status=400, headers=cors)
+        sana = request.query.get("sana") or db.today_tk().isoformat()
+        x = db.kunlik_xulosa(hid, str(sana)[:10])
+        p = db.gps_oxirgi(hid)
+        x["hozir"] = {"lat": p["lat"], "lon": p["lon"], "vaqt": (p["vaqt"][11:16] if p.get("vaqt") else None)} if p else None
+        return web.json_response(x, headers=cors)
 
     async def api_haydovchi_qosh(request):
         if not is_owner(request):
@@ -369,6 +385,7 @@ def make_web_app(bot_token):
     app.router.add_post("/api/gps_off", api_gps_off)
     app.router.add_get("/api/haydovchilar", api_haydovchilar)
     app.router.add_get("/api/tv", api_tv)
+    app.router.add_get("/api/tv_marshrut", api_tv_marshrut)
     app.router.add_post("/api/haydovchi_qosh", api_haydovchi_qosh)
     app.router.add_post("/api/haydovchi_ochir", api_haydovchi_ochir)
     app.router.add_get("/api/haydovchi_kuzat", api_haydovchi_kuzat)
