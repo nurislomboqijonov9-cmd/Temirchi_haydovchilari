@@ -372,6 +372,45 @@ def make_web_app(bot_token):
         return web.json_response({"ism": h["ism"], "nuqta": p,
                                   "daqiqa_oldin": (round(age) if age is not None else None)})
 
+    async def yol_sahifa(request):
+        return await _file("yol.html")
+
+    async def api_yol(request):
+        """Mijozga jonli: haydovchi joylashuvi + manzil + ETA."""
+        tok = request.match_info.get("token", "")
+        y = db.yetkazish_get(tok)
+        if not y:
+            return web.json_response({"xato": "topilmadi"}, status=404)
+        h = db.haydovchi_get(y["haydovchi_id"])
+        p = db.gps_oxirgi(y["haydovchi_id"])
+        mijoz = {"lat": y["mlat"], "lon": y["mlon"]}
+        holat = y["holat"]
+        masofa_km = eta_min = None
+        online = False
+        nuqta = None
+        if p:
+            age = db.gps_age_daqiqa(p["vaqt"])
+            online = (age is not None and age <= 5)
+            nuqta = {"lat": p["lat"], "lon": p["lon"], "vaqt": (p["vaqt"][11:16] if p.get("vaqt") else None)}
+            m = db._dist_m({"lat": p["lat"], "lon": p["lon"]}, {"lat": y["mlat"], "lon": y["mlon"]})
+            masofa_km = round(m / 1000.0, 2)
+            # ETA: yo'l koeffitsiyenti 1.35, o'rtacha 28 km/soat
+            eta_min = max(1, round((m / 1000.0) * 1.35 / 28.0 * 60))
+            # Yetib bordi (150 m) -> avtomat yakun
+            if holat == "faol" and m <= 150:
+                db.yetkazish_yakunla(tok)
+                holat = "yakunlandi"
+        return web.json_response({
+            "holat": holat,
+            "haydovchi": (h["ism"] if h else "Haydovchi"),
+            "online": online,
+            "nuqta": nuqta,
+            "mijoz": mijoz,
+            "masofa_km": masofa_km,
+            "eta_min": eta_min,
+            "izoh": y.get("izoh"),
+        }, headers={"Access-Control-Allow-Origin": "*"})
+
     app.router.add_get("/", panel)
     app.router.add_get("/kuzat", kuzat_kirish)
     app.router.add_get("/kuzat/{token}", kuzat_kirish)
@@ -395,6 +434,8 @@ def make_web_app(bot_token):
     app.router.add_get("/api/token", api_owner_token)
     app.router.add_get("/api/whoami", api_whoami)
     app.router.add_get("/jonli/{token}", jonli)
+    app.router.add_get("/yol/{token}", yol_sahifa)
+    app.router.add_get("/api/yol/{token}", api_yol)
     app.router.add_get("/api/jonli", api_jonli)
     app.router.add_get("/api/haydovchi_share", api_haydovchi_share)
     return app

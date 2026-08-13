@@ -1,0 +1,105 @@
+<!doctype html><html lang="uz"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>TEMIRCHI — Yetkazib berish</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1a2e}
+#map{position:fixed;inset:0}
+.bar{position:fixed;top:0;left:0;right:0;z-index:500;background:#16294A;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.bar .logo{width:34px;height:34px;border-radius:9px;background:#0e1f3a;display:flex;align-items:center;justify-content:center;font-size:18px}
+.bar b{font-size:16px;letter-spacing:.03em}.bar b i{color:#5fb894;font-style:normal}
+.bar .sub{font-size:12px;opacity:.7}
+.card{position:fixed;left:12px;right:12px;bottom:12px;z-index:500;background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.eta{display:flex;align-items:center;gap:12px}
+.eta .big{font-size:30px;font-weight:900;color:#16294A;line-height:1}
+.eta .u{font-size:14px;color:#7a8aa0;font-weight:600}
+.eta .ic{width:46px;height:46px;border-radius:12px;background:#eaf3ef;display:flex;align-items:center;justify-content:center;font-size:24px}
+.meta{margin-top:10px;display:flex;gap:14px;color:#5a6b82;font-size:13px;flex-wrap:wrap}
+.meta b{color:#16294A}
+.done .big{color:#2e9e6b}
+.dot{width:9px;height:9px;border-radius:50%;background:#39d98a;display:inline-block;margin-right:5px;animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.3}}
+.mk{width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5)}
+.mk.drv{background:#2e9e6b}.mk.cli{background:#e05a5a}
+.truck{font-size:26px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+</style></head>
+<body>
+<div id="map"></div>
+<div class="bar">
+  <div class="logo">🏗️</div>
+  <div><b>TEMIR<i>CHI</i></b><div class="sub" id="drv">Yetkazib berish</div></div>
+  <div style="margin-left:auto;font-size:12px;opacity:.85" id="stat"><span class="dot"></span>Jonli</div>
+</div>
+<div class="card" id="card">
+  <div class="eta">
+    <div class="ic" id="eic">🚚</div>
+    <div><div class="big"><span id="eta">—</span> <span class="u" id="etau">daqiqa</span></div>
+      <div class="u" id="etasub">hisoblanmoqda…</div></div>
+  </div>
+  <div class="meta"><span>📍 Masofa: <b id="masofa">—</b></span><span id="oxvaqt"></span></div>
+</div>
+<script>
+const TOKEN=location.pathname.split('/').filter(Boolean).pop();
+let map,drvM,cliM,line,osrmLine,done=false;
+function icon(cls,html){ return L.divIcon({className:'',html:html||('<div class="mk '+cls+'"></div>'),iconSize:[16,16],iconAnchor:[8,8]});}
+function initMap(lat,lon){
+  map=L.map('map',{zoomControl:false,attributionControl:false}).setView([lat,lon],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+}
+async function osrm(a,b){
+  try{
+    const u=`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=full&geometries=geojson`;
+    const r=await fetch(u); const d=await r.json();
+    if(d.routes&&d.routes[0]) return {coords:d.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]),dur:d.routes[0].duration};
+  }catch(e){}
+  return null;
+}
+async function tick(){
+  let d; try{ const r=await fetch('/api/yol/'+TOKEN); d=await r.json(); }catch(e){ return; }
+  if(d.xato){ document.getElementById('etasub').textContent='Havola topilmadi'; return; }
+  document.getElementById('drv').textContent='🚚 '+(d.haydovchi||'Haydovchi');
+  const mij=d.mijoz, nuq=d.nuqta;
+  if(!map && mij) initMap(mij.lat,mij.lon);
+  // mijoz markeri
+  if(mij && !cliM){ cliM=L.marker([mij.lat,mij.lon],{icon:icon('cli')}).addTo(map).bindTooltip('📍 Manzil',{permanent:true,direction:'top',offset:[0,-8]});}
+  // holat: yakunlandi
+  if(d.holat==='yakunlandi' && !done){
+    done=true;
+    document.getElementById('eic').textContent='✅';
+    document.getElementById('card').classList.add('done');
+    document.getElementById('eta').textContent='Yetib bordi';
+    document.getElementById('etau').textContent='';
+    document.getElementById('etasub').textContent='Haydovchi manzilga yetib keldi';
+    document.getElementById('stat').innerHTML='✅ Yakunlandi';
+    return;
+  }
+  if(nuq){
+    if(!drvM){ drvM=L.marker([nuq.lat,nuq.lon],{icon:icon('','<div class="truck">🚚</div>'),zIndexOffset:1000}).addTo(map);}
+    else drvM.setLatLng([nuq.lat,nuq.lon]);
+    // yo'nalish chizig'i (OSRM yo'l, bo'lmasa to'g'ri chiziq)
+    const road=await osrm([nuq.lat,nuq.lon],[mij.lat,mij.lon]);
+    if(osrmLine){ map.removeLayer(osrmLine); osrmLine=null; }
+    if(line){ map.removeLayer(line); line=null; }
+    if(road){
+      osrmLine=L.polyline(road.coords,{color:'#16294A',weight:6,opacity:.85}).addTo(map);
+      // OSRM ETA (aniqroq)
+      const m=Math.max(1,Math.round(road.dur/60));
+      document.getElementById('eta').textContent=m;
+    }else{
+      line=L.polyline([[nuq.lat,nuq.lon],[mij.lat,mij.lon]],{color:'#16294A',weight:5,opacity:.7,dashArray:'8,8'}).addTo(map);
+      document.getElementById('eta').textContent=(d.eta_min!=null?d.eta_min:'—');
+    }
+    document.getElementById('etau').textContent='daqiqa';
+    document.getElementById('etasub').textContent=(d.online?'Haydovchi yo\'lda 🟢':'Signal kutilmoqda…');
+    document.getElementById('masofa').textContent=(d.masofa_km!=null?d.masofa_km+' km':'—');
+    document.getElementById('oxvaqt').innerHTML=nuq.vaqt?('🕐 Yangilandi: <b>'+nuq.vaqt+'</b>'):'';
+    // ko'rinishni moslash
+    try{ map.fitBounds([[nuq.lat,nuq.lon],[mij.lat,mij.lon]],{padding:[70,70],maxZoom:15}); }catch(e){}
+  }else{
+    document.getElementById('etasub').textContent='Haydovchi signali kutilmoqda…';
+  }
+}
+tick(); setInterval(()=>{ if(!done) tick(); },12000);
+</script></body></html>

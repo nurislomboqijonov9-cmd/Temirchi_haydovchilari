@@ -2,7 +2,7 @@
 import os, asyncio, logging, datetime as dt
 from aiohttp import web as aioweb
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, WebAppInfo
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
 
 import db
 from server import make_web_app, make_token
@@ -112,10 +112,55 @@ async def hisobot_loop(app):
         await asyncio.sleep(50)
 
 
+async def lokatsiya(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Ega manzil (📍) yubordi -> qaysi haydovchi deb so'raymiz."""
+    if OWNER_ID and update.effective_user.id != OWNER_ID:
+        return
+    loc = update.message.location
+    ctx.user_data["yol_lat"] = loc.latitude
+    ctx.user_data["yol_lon"] = loc.longitude
+    hs = db.haydovchilar()
+    if not hs:
+        await update.message.reply_text("Avval haydovchi qo'shing (panelda).")
+        return
+    tugma = [[InlineKeyboardButton(f"🚚 {h['ism']}", callback_data=f"yol:{h['id']}")] for h in hs]
+    await update.message.reply_text(
+        "📍 Manzil qabul qilindi.\nQaysi haydovchi olib boradi?",
+        reply_markup=InlineKeyboardMarkup(tugma))
+
+
+async def yol_tanla(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Haydovchi tanlandi -> ssilka yaratamiz."""
+    q = update.callback_query
+    await q.answer()
+    if OWNER_ID and q.from_user.id != OWNER_ID:
+        return
+    try:
+        hid = int(q.data.split(":")[1])
+    except Exception:
+        return
+    lat = ctx.user_data.get("yol_lat")
+    lon = ctx.user_data.get("yol_lon")
+    if lat is None:
+        await q.edit_message_text("Manzil topilmadi. Qaytadan 📍 lokatsiya yuboring.")
+        return
+    h = db.haydovchi_get(hid)
+    tok = db.yetkazish_qosh(hid, lat, lon)
+    link = f"{WEBAPP_URL}/yol/{tok}" if WEBAPP_URL else f"/yol/{tok}"
+    await q.edit_message_text(
+        f"✅ Tayyor! *{h['ism'] if h else 'Haydovchi'}* uchun kuzatuv havolasi:\n\n"
+        f"{link}\n\n"
+        "Shu havolani *mijozga* yuboring. Mijoz haydovchining jonli harakati va "
+        "necha daqiqada yetib borishini ko'radi. Yetib borgach havola avtomat yopiladi.",
+        parse_mode="Markdown", disable_web_page_preview=True)
+
+
 async def run():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("otchot", otchot))
+    app.add_handler(MessageHandler(filters.LOCATION, lokatsiya))
+    app.add_handler(CallbackQueryHandler(yol_tanla, pattern=r"^yol:"))
 
     port = int(os.getenv("PORT", "8080"))
     runner = aioweb.AppRunner(make_web_app(TOKEN))

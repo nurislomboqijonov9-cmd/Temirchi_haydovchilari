@@ -268,3 +268,38 @@ def gps_age_daqiqa(vaqt):
         return (now - d).total_seconds() / 60
     except Exception:
         return None
+
+
+# ---------------- Yetkazish (mijozga jonli ssilka) ----------------
+def yetkazish_qosh(haydovchi_id, lat, lon, izoh=None):
+    """Yangi yetkazish yaratadi, token qaytaradi."""
+    tok = secrets.token_urlsafe(8)
+    con = _con()
+    con.execute("""CREATE TABLE IF NOT EXISTS yetkazish(
+        token TEXT PRIMARY KEY, haydovchi_id INTEGER,
+        mlat REAL, mlon REAL, izoh TEXT,
+        holat TEXT DEFAULT 'faol', created TEXT, yakun TEXT)""")
+    con.execute("INSERT INTO yetkazish(token,haydovchi_id,mlat,mlon,izoh,holat,created) VALUES(?,?,?,?,?,'faol',?)",
+                (tok, int(haydovchi_id), float(lat), float(lon), izoh, now_tk().isoformat()))
+    con.commit()
+    con.close()
+    return tok
+
+
+def yetkazish_get(token):
+    con = _con()
+    con.execute("""CREATE TABLE IF NOT EXISTS yetkazish(
+        token TEXT PRIMARY KEY, haydovchi_id INTEGER,
+        mlat REAL, mlon REAL, izoh TEXT,
+        holat TEXT DEFAULT 'faol', created TEXT, yakun TEXT)""")
+    r = con.execute("SELECT * FROM yetkazish WHERE token=?", (token,)).fetchone()
+    con.close()
+    return dict(r) if r else None
+
+
+def yetkazish_yakunla(token):
+    con = _con()
+    con.execute("UPDATE yetkazish SET holat='yakunlandi', yakun=? WHERE token=?",
+                (now_tk().isoformat(), token))
+    con.commit()
+    con.close()
